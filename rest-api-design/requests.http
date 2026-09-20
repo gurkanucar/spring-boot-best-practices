@@ -1,0 +1,168 @@
+### 1. Create student
+POST http://localhost:8080/api/v1/students
+Content-Type: application/json
+
+{ "fullName": "Jane Smith", "email": "jane@example.com" }
+
+### 1b. Invalid create — field errors
+POST http://localhost:8080/api/v1/students
+Content-Type: application/json
+
+{ "fullName": "", "email": "not-an-email" }
+
+### 1c. Duplicate email — 409
+# Run request 1 first.
+POST http://localhost:8080/api/v1/students
+Content-Type: application/json
+
+{ "fullName": "Another Jane", "email": "jane@example.com" }
+
+### 2. Get student by id — note the ETag response header
+GET http://localhost:8080/api/v1/students/1
+
+### 2b. PUT without If-Match — 428
+PUT http://localhost:8080/api/v1/students/1
+Content-Type: application/json
+
+{ "fullName": "Jane Doe", "email": "jane@example.com", "phoneNumber": null, "status": "ACTIVE" }
+
+### 2c. PUT with a stale If-Match — 412
+PUT http://localhost:8080/api/v1/students/1
+Content-Type: application/json
+If-Match: "99"
+
+{ "fullName": "Jane Doe", "email": "jane@example.com", "phoneNumber": null, "status": "ACTIVE" }
+
+### 2d. PUT with the correct If-Match — succeeds, ETag becomes "1"
+# Read the ETag from request 2's response before running this.
+PUT http://localhost:8080/api/v1/students/1
+Content-Type: application/json
+If-Match: "0"
+
+{ "fullName": "Jane Doe", "email": "jane@example.com", "phoneNumber": "+15550001111", "status": "ACTIVE" }
+
+### 3. PATCH — merge-patch sets only the mentioned field
+# Use whatever ETag GET /students/1 currently returns.
+PATCH http://localhost:8080/api/v1/students/1
+Content-Type: application/merge-patch+json
+If-Match: "1"
+
+{ "phoneNumber": "+15559998888" }
+
+### 3b. PATCH with explicit null — clears phoneNumber
+PATCH http://localhost:8080/api/v1/students/1
+Content-Type: application/merge-patch+json
+If-Match: "2"
+
+{ "phoneNumber": null }
+
+### 3c. PATCH with explicit null on a required field — 400
+PATCH http://localhost:8080/api/v1/students/1
+Content-Type: application/merge-patch+json
+If-Match: "3"
+
+{ "fullName": null }
+
+### 3d. PATCH with the wrong Content-Type — 415
+PATCH http://localhost:8080/api/v1/students/1
+Content-Type: application/json
+If-Match: "3"
+
+{ "phoneNumber": "+15550001111" }
+
+### 4. List students — pagination + sort
+GET http://localhost:8080/api/v1/students?page=0&size=20&sortBy=fullName&sortDir=asc
+
+### 4b. Unknown sort field — clean 400
+GET http://localhost:8080/api/v1/students?sortBy=bogus
+
+### 5. Delete student
+# Create a throwaway student first if you want to see this succeed without breaking the flow below.
+DELETE http://localhost:8080/api/v1/students/1
+
+### 6. Create a course (starts DRAFT)
+POST http://localhost:8080/api/v1/courses
+Content-Type: application/json
+
+{ "title": "Intro to REST", "description": "Basics of resource design", "capacity": 10 }
+
+### 6b. Publish the course
+POST http://localhost:8080/api/v1/courses/1/publish
+
+### 6c. Publish again — 409, already PUBLISHED
+POST http://localhost:8080/api/v1/courses/1/publish
+
+### 6d. Archive the course
+POST http://localhost:8080/api/v1/courses/1/archive
+
+### 7. PATCH course — clear description with explicit null
+# Use a fresh DRAFT course id and its current ETag.
+PATCH http://localhost:8080/api/v1/courses/1
+Content-Type: application/merge-patch+json
+If-Match: "0"
+
+{ "description": null }
+
+### 8. Create a fresh student and a small-capacity course for the enrollment flow
+POST http://localhost:8080/api/v1/students
+Content-Type: application/json
+
+{ "fullName": "Bob Jones", "email": "bob@example.com" }
+
+### 8b.
+POST http://localhost:8080/api/v1/courses
+Content-Type: application/json
+
+{ "title": "Small Course", "description": "capacity 1", "capacity": 1 }
+
+### 9. Enroll before the course is published — 409
+# Use the ids created in 8/8b.
+POST http://localhost:8080/api/v1/enrollments
+Content-Type: application/json
+
+{ "studentId": 2, "courseId": 2 }
+
+### 9b. Publish it
+POST http://localhost:8080/api/v1/courses/2/publish
+
+### 10. Enroll — succeeds
+POST http://localhost:8080/api/v1/enrollments
+Content-Type: application/json
+
+{ "studentId": 2, "courseId": 2 }
+
+### 10b. Enroll the same student again — 409, duplicate active enrollment
+POST http://localhost:8080/api/v1/enrollments
+Content-Type: application/json
+
+{ "studentId": 2, "courseId": 2 }
+
+### 10c. Enroll a second student — 409, course at capacity (capacity was 1)
+# Create a third student first, then try enrolling them here.
+POST http://localhost:8080/api/v1/enrollments
+Content-Type: application/json
+
+{ "studentId": 3, "courseId": 2 }
+
+### 11. Relationship views
+GET http://localhost:8080/api/v1/courses/2/students
+
+### 11b.
+GET http://localhost:8080/api/v1/students/2/courses
+
+### 12. Complete the enrollment
+# Use the enrollment id returned by request 10.
+POST http://localhost:8080/api/v1/enrollments/1/complete
+
+### 12b. Complete it again — 409, no longer ACTIVE
+POST http://localhost:8080/api/v1/enrollments/1/complete
+
+### 13. Delete the course while it still has an active enrollment — 409
+# Try this before completing/dropping the enrollment above.
+DELETE http://localhost:8080/api/v1/courses/2
+
+### 14. Versioning — v1 keeps fullName whole, v2 splits it
+GET http://localhost:8080/api/v1/students/2
+
+### 14b.
+GET http://localhost:8080/api/v2/students/2
