@@ -10,6 +10,8 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJacksonJsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
+import tools.jackson.databind.jsontype.PolymorphicTypeValidator;
 
 import java.time.Duration;
 
@@ -22,6 +24,26 @@ import java.time.Duration;
  * {@code app.redis.key-prefix} (the same namespace used for all Redis keys, e.g. OTP) so
  * caches don't collide with other applications on a shared Redis — set it to e.g.
  * {@code "myapp:"} to get keys like {@code myapp:users::123}. Empty by default.
+ *
+ * <p><b>Default typing is deliberately enabled</b> (with a {@link PolymorphicTypeValidator}).
+ * Without it, {@code GenericJacksonJsonRedisSerializer} writes plain JSON with no
+ * {@code @class} hint, so reading a cached value back deserializes into a generic
+ * {@code LinkedHashMap} instead of your actual type — the cache write "succeeds" silently,
+ * and the NEXT read (the cache hit) throws {@code ClassCastException} when Spring's proxy
+ * tries to return it as the method's real return type. This is easy to miss because a single
+ * call always looks fine; it's the second call — the hit — that breaks.
+ *
+ * <p>The validator allows {@code com.gucardev.caching.*} (this project's own types) plus
+ * {@code java.math.*}/{@code java.time.*}/{@code java.util.*} — not because those packages
+ * are "trusted" in some deep sense, but because Jackson's default typing tags certain
+ * JDK scalar types (confirmed: {@code BigDecimal}) even under {@code NON_FINAL} mode, since
+ * a bare JSON number is ambiguous — it could be a {@code Double} or a {@code BigDecimal} —
+ * and a validator that only allowed this project's own package rejected resolving that tag,
+ * breaking every cached value containing one. This is deliberately NOT
+ * {@code enableUnsafeDefaultTyping()}, which allows deserializing ANY class on the classpath:
+ * Redis is an external, potentially-shared store, and an unrestricted validator turns
+ * "whatever JSON happens to be at this key" into "whatever class Jackson is told to
+ * instantiate" — a real deserialization attack surface, not just a style preference.
  *
  * <p>Managers build lazily, so the application starts even when Redis is unreachable;
  * connection happens on first use.
@@ -36,6 +58,13 @@ public class RedisCacheConfig {
      */
     @Value("${app.redis.key-prefix:}")
     private String keyPrefix;
+
+    private static final PolymorphicTypeValidator TYPE_VALIDATOR = BasicPolymorphicTypeValidator.builder()
+            .allowIfSubType("com.gucardev.caching.")
+            .allowIfSubType("java.math.")
+            .allowIfSubType("java.time.")
+            .allowIfSubType("java.util.")
+            .build();
 
     @Bean(CacheManagers.REDIS_30S)
     public CacheManager redis30s(RedisConnectionFactory connectionFactory) {
@@ -80,7 +109,9 @@ public class RedisCacheConfig {
                 .serializeKeysWith(RedisSerializationContext.SerializationPair
                         .fromSerializer(new StringRedisSerializer()))
                 .serializeValuesWith(RedisSerializationContext.SerializationPair
-                        .fromSerializer(GenericJacksonJsonRedisSerializer.builder().build()));
+                        .fromSerializer(GenericJacksonJsonRedisSerializer.builder()
+                                .enableDefaultTyping(TYPE_VALIDATOR)
+                                .build()));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(config)

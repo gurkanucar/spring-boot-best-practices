@@ -1,3 +1,21 @@
 spring:
   application:
     name: caching
+  data:
+    redis:
+      # Matches docker-compose.yml's port mapping. Both are plain Spring Boot properties,
+      # so either can be overridden per environment via env vars without touching this
+      # file, e.g. SPRING_DATA_REDIS_HOST / SPRING_DATA_REDIS_PORT.
+      host: localhost
+      port: 6379
+      # Short timeouts so a Redis outage fails fast instead of blocking each call for
+      # Lettuce's 60s default — CachingConfig's error handler then swallows the failure
+      # and the caller proceeds as a cache miss, quickly rather than eventually.
+      #
+      # 1s measured genuinely flaky in local dev (Docker Desktop's networking adds enough
+      # latency that a cold connection's first command occasionally exceeded it, silently
+      # falling back to a cache miss — confirmed by re-running the same test 8x: ~25%
+      # failure rate at 1s). 2s is still nowhere near Lettuce's 60s default and gives real
+      # headroom without weakening the actual point (fail fast, don't hang).
+      connect-timeout: 2s
+      timeout: 2s

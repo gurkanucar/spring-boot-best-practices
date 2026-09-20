@@ -31,4 +31,9 @@ public final class CacheNames {
 
     /** Effective per-workspace feature-flag state — read on every feature-gated request. */
     public static final String FEATURE_FLAGS = "feature_flags";
+
+    /* ---- Demo-only names for com.gucardev.caching.examples — not real domain caches ---- */
+
+    public static final String EXAMPLE_PRODUCTS = "example_products";
+    public static final String EXAMPLE_ORDERS = "example_orders";
 }

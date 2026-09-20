@@ -1,0 +1,20 @@
+# Local Redis for the RedisCacheManager beans in RedisCacheConfig.
+#
+# Deliberately no volume: this is a cache, not a datastore — losing everything on
+# `docker compose down` is correct behavior, not a gap.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: caching-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
