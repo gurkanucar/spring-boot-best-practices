@@ -1,0 +1,108 @@
+### 1. Basic validation — valid
+POST http://localhost:8080/api/basic/users
+Content-Type: application/json
+
+{ "fullName": "Ayse Yilmaz", "email": "ayse@example.com", "age": 30, "birthDate": "1996-05-04", "phone": "05321234567" }
+
+### 1b. Basic validation — invalid (6 errors: fullName fails both NotBlank and Size, counted twice)
+POST http://localhost:8080/api/basic/users
+Content-Type: application/json
+
+{ "fullName": "", "email": "gecersiz", "age": 12, "birthDate": "2090-01-01", "phone": "123" }
+
+### 1c. Basic validation — English messages
+POST http://localhost:8080/api/basic/users
+Content-Type: application/json
+Accept-Language: en
+
+{ "fullName": "", "email": "gecersiz", "age": 12, "birthDate": "2090-01-01", "phone": "123" }
+
+### 2. Custom constraints — valid
+POST http://localhost:8080/api/custom/users
+Content-Type: application/json
+
+{ "tcKimlikNo": "10000000146", "password": "Gucl!Parola1", "role": "admin" }
+
+### 2b. Custom constraints — all three invalid
+POST http://localhost:8080/api/custom/users
+Content-Type: application/json
+
+{ "tcKimlikNo": "11111111111", "password": "zayif", "role": "SUPERUSER" }
+
+### 3. Cross-field — passwords don't match
+POST http://localhost:8080/api/cross-field/users
+Content-Type: application/json
+
+{ "password": "Gucl!Parola1", "passwordConfirm": "BaskaParola1!", "startDate": "2026-01-01", "endDate": "2026-12-31" }
+
+### 3b. Cross-field — reversed date range
+POST http://localhost:8080/api/cross-field/users
+Content-Type: application/json
+
+{ "password": "Gucl!Parola1", "passwordConfirm": "Gucl!Parola1", "startDate": "2026-12-31", "endDate": "2026-01-01" }
+
+### 4. Group (create) — id must not be sent, password required
+POST http://localhost:8080/api/groups/users
+Content-Type: application/json
+
+{ "id": 5, "fullName": "Ayse Yilmaz", "email": "ayse@example.com" }
+
+### 4b. Group (update) — id required, password optional
+PUT http://localhost:8080/api/groups/users
+Content-Type: application/json
+
+{ "fullName": "Ayse Yilmaz", "email": "ayse@example.com" }
+
+### 5. Path variable — invalid
+GET http://localhost:8080/api/params/users/0
+
+### 5b. Request param — invalid email
+GET http://localhost:8080/api/params/users/search?email=gecersiz
+
+### 6. Nested — nested field errors
+POST http://localhost:8080/api/nested/users
+Content-Type: application/json
+
+{ "fullName": "Ayse Yilmaz", "address": { "city": "", "district": "Cankaya", "postalCode": "123" }, "contacts": [ { "type": "EMAIL", "value": "ayse@example.com" } ] }
+
+### 6b. Bulk — second element invalid
+POST http://localhost:8080/api/nested/users/bulk
+Content-Type: application/json
+
+[
+  { "fullName": "Ayse Yilmaz", "address": { "city": "Ankara", "district": "Cankaya", "postalCode": "06500" }, "contacts": [ { "type": "EMAIL", "value": "ayse@example.com" } ] },
+  { "fullName": "", "address": { "city": "Izmir", "district": "Konak", "postalCode": "35000" }, "contacts": [ { "type": "EMAIL", "value": "ali@example.com" } ] }
+]
+
+### 7. Real registration — 201
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{ "fullName": "Ayse Yilmaz", "email": "ayse@example.com", "tcKimlikNo": "10000000146", "age": 30, "role": "VIEWER", "address": { "city": "Ankara", "district": "Cankaya", "postalCode": "06500" } }
+
+### 7b. Same email again — application layer returns 400
+# Run request 7 first to create the record, then run this one.
+POST http://localhost:8080/api/users
+Content-Type: application/json
+
+{ "fullName": "Ali Veli", "email": "ayse@example.com", "tcKimlikNo": "12345678950", "age": 30, "role": "VIEWER", "address": { "city": "Ankara", "district": "Cankaya", "postalCode": "06500" } }
+
+### 7c. Application check skipped — DB returns 409
+# Run this once first to create the record, then run it again (the second run returns 409).
+POST http://localhost:8080/api/users/unsafe
+Content-Type: application/json
+
+{ "fullName": "Ali Veli", "email": "veli@example.com", "tcKimlikNo": "12345678950", "age": 30, "role": "VIEWER", "address": { "city": "Ankara", "district": "Cankaya", "postalCode": "06500" } }
+
+### 7d. Service layer @Min violation
+GET http://localhost:8080/api/users/0
+
+### 7e. User not found — 404
+GET http://localhost:8080/api/users/999999
+
+### 7f. Unsafe + underage — no @Min(18) on the DTO, so the users_age_check DB constraint fires (409)
+# Use a fresh, unused email/tcKimlikNo pair each run; the ones above are already persisted.
+POST http://localhost:8080/api/users/unsafe
+Content-Type: application/json
+
+{ "fullName": "Cocuk Yilmaz", "email": "cocuk@example.com", "tcKimlikNo": "23456789138", "age": 15, "role": "VIEWER", "address": { "city": "Ankara", "district": "Cankaya", "postalCode": "06500" } }
