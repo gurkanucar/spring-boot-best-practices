@@ -1,0 +1,3 @@
+# Optional Logback queue demo, independent of the @Async worker example.
+logging:
+  config: classpath:logback-async-spring.xml

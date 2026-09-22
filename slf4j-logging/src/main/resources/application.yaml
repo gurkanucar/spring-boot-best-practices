@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: slf4j-logging
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8083
+
+logging:
+  level:
+    root: INFO
+    com.gucardev.slf4jlogging: INFO
+    audit: INFO
+  # %kvp renders SLF4J 2 key/value pairs; %X reads the current thread's MDC.
+  pattern:
+    console: '%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} requestId=%X{requestId:-none} %marker %kvp - %msg%n%wEx'

@@ -1,0 +1,4 @@
+# Only our examples become verbose; framework loggers stay at INFO.
+logging:
+  level:
+    com.gucardev.slf4jlogging: TRACE

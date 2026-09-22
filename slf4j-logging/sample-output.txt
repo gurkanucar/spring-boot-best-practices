@@ -1,0 +1,204 @@
+slf4j-logging - sample run output
+==================================
+Captured by actually running the app (--spring.profiles.active=dev) and
+calling every endpoint with curl. HTTP responses and the matching console
+log lines are shown together so you can see how the request/response maps
+to what got logged. requestId values are real UUIDs generated per request.
+
+
+1) POST /api/logging/levels/1
+------------------------------
+Response:
+  {"example":"levels","requestId":"96ced486-c9d7-4f7c-826f-e447f41e4c07"}
+
+Console:
+  21:26:44.128 TRACE [http-nio-8083-exec-4] c.g.s.examples.LoggingExamples requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07   - Example TRACE: inspecting calculation steps orderId=1
+  21:26:44.128 DEBUG [http-nio-8083-exec-4] c.g.s.examples.LoggingExamples requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07   - Example DEBUG: preparing order orderId=1
+  21:26:44.128 INFO  [http-nio-8083-exec-4] c.g.s.examples.LoggingExamples requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07   - Example INFO: order accepted orderId=1
+  21:26:44.128 WARN  [http-nio-8083-exec-4] c.g.s.examples.LoggingExamples requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07   - Example WARN: simulated slow dependency orderId=1
+  21:26:44.128 ERROR [http-nio-8083-exec-4] c.g.s.examples.LoggingExamples requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07   - Example ERROR: simulated processing failure orderId=1
+  21:26:44.129 INFO  [http-nio-8083-exec-4] c.g.s.web.RequestLoggingFilter requestId=96ced486-c9d7-4f7c-826f-e447f41e4c07  event="http.completed" method="POST" route="/api/logging/levels/{orderId}" status="200" elapsedMs="1" - HTTP request completed
+
+  Note: TRACE only appears because the "dev" profile raises
+  com.gucardev.slf4jlogging to TRACE (see application-dev.yaml). With no
+  profile active (root/package level = INFO), only the last three lines
+  (INFO/WARN/ERROR) would print.
+
+
+2) POST /api/logging/parameterized/1
+-------------------------------------
+Response:
+  {"example":"parameterized","requestId":"88f382fc-c1e6-4efc-a921-892b183effa3"}
+
+Console:
+  21:26:44.164 INFO  [http-nio-8083-exec-2] c.g.s.examples.LoggingExamples requestId=88f382fc-c1e6-4efc-a921-892b183effa3   - Order selected orderId=1 itemCount=3
+  21:26:44.165 INFO  [http-nio-8083-exec-2] c.g.s.web.RequestLoggingFilter requestId=88f382fc-c1e6-4efc-a921-892b183effa3  event="http.completed" method="POST" route="/api/logging/parameterized/{orderId}" status="200" elapsedMs="2" - HTTP request completed
+
+
+3) POST /api/logging/lazy/1
+----------------------------
+Response:
+  {"example":"lazy","requestId":"e94d1620-6e89-4457-a378-ad6080e27704"}
+
+Console:
+  21:26:44.202 DEBUG [http-nio-8083-exec-6] c.g.s.examples.LoggingExamples requestId=e94d1620-6e89-4457-a378-ad6080e27704   - Guarded summary orderId=1 summary=summary-for-order-1
+  21:26:44.202 DEBUG [http-nio-8083-exec-6] c.g.s.examples.LoggingExamples requestId=e94d1620-6e89-4457-a378-ad6080e27704   - Lazy summary orderId=1 summary=summary-for-order-1
+  21:26:44.204 INFO  [http-nio-8083-exec-6] c.g.s.web.RequestLoggingFilter requestId=e94d1620-6e89-4457-a378-ad6080e27704  event="http.completed" method="POST" route="/api/logging/lazy/{orderId}" status="200" elapsedMs="2" - HTTP request completed
+
+
+4) POST /api/logging/structured/1
+----------------------------------
+Response:
+  {"example":"structured","requestId":"cb656c72-3ecc-416c-b81c-f89223b0845c"}
+
+Console:
+  21:26:44.240 INFO  [http-nio-8083-exec-8] c.g.s.examples.LoggingExamples requestId=cb656c72-3ecc-416c-b81c-f89223b0845c  event="order.previewed" orderId="1" itemCount="3" - Order preview generated
+  21:26:44.240 INFO  [http-nio-8083-exec-8] c.g.s.web.RequestLoggingFilter requestId=cb656c72-3ecc-416c-b81c-f89223b0845c  event="http.completed" method="POST" route="/api/logging/structured/{orderId}" status="200" elapsedMs="1" - HTTP request completed
+
+  Note: the %kvp pattern renders addKeyValue(...) pairs (event=, orderId=,
+  itemCount=) separately from the message text. With the "json" profile
+  active, these become real fields in the JSON log object instead of
+  inline text - see section 12 below.
+
+
+5) POST /api/logging/audit/1
+-----------------------------
+Response:
+  {"example":"audit","requestId":"8f854f06-8414-4d97-bf11-14b902d9e11f"}
+
+Console:
+  21:26:44.277 INFO  [http-nio-8083-exec-10] audit requestId=8f854f06-8414-4d97-bf11-14b902d9e11f AUDIT event="order.processed.audit" actor="demo-user" orderId="1" - Demo audit event
+  21:26:44.278 INFO  [http-nio-8083-exec-10] c.g.s.web.RequestLoggingFilter requestId=8f854f06-8414-4d97-bf11-14b902d9e11f  event="http.completed" method="POST" route="/api/logging/audit/{orderId}" status="200" elapsedMs="1" - HTTP request completed
+
+  Note: the logger name is "audit" (not the class name) because of
+  @Slf4j(topic = "audit"), and "AUDIT" is a marker, not a level - both are
+  labels you can filter/route on in logback config.
+
+
+6) POST /api/logging/orders/1?mode=SUCCESS
+-------------------------------------------
+Response:
+  {"orderId":1,"status":"primary"}
+
+Console:
+  21:26:44.318 DEBUG [http-nio-8083-exec-4] c.g.s.examples.OrderExamples requestId=3b6565dd-c5c2-44ec-8318-09b1a0c00359   - Starting order processing orderId=1 mode=SUCCESS
+  21:26:44.318 INFO  [http-nio-8083-exec-4] c.g.s.examples.OrderExamples requestId=3b6565dd-c5c2-44ec-8318-09b1a0c00359  event="order.processed" orderId="1" source="primary" - Order processing completed
+  21:26:44.318 INFO  [http-nio-8083-exec-4] audit requestId=3b6565dd-c5c2-44ec-8318-09b1a0c00359 AUDIT event="order.processed.audit" actor="demo-user" orderId="1" - Demo audit event
+  21:26:44.320 INFO  [http-nio-8083-exec-4] c.g.s.web.RequestLoggingFilter requestId=3b6565dd-c5c2-44ec-8318-09b1a0c00359  event="http.completed" method="POST" route="/api/logging/orders/{orderId}" status="200" elapsedMs="6" - HTTP request completed
+
+
+7) POST /api/logging/orders/2?mode=FALLBACK
+--------------------------------------------
+Response:
+  {"orderId":2,"status":"fallback"}
+
+Console:
+  21:26:44.359 DEBUG [http-nio-8083-exec-2] c.g.s.examples.OrderExamples requestId=a64a1e6e-e3d9-4eef-bfc4-1db306caefe0   - Starting order processing orderId=2 mode=FALLBACK
+  21:26:44.359 WARN  [http-nio-8083-exec-2] c.g.s.examples.OrderExamples requestId=a64a1e6e-e3d9-4eef-bfc4-1db306caefe0   - Recommendations unavailable; using defaults orderId=2
+  21:26:44.359 INFO  [http-nio-8083-exec-2] c.g.s.examples.OrderExamples requestId=a64a1e6e-e3d9-4eef-bfc4-1db306caefe0  event="order.processed" orderId="2" source="fallback" - Order processing completed
+  21:26:44.359 INFO  [http-nio-8083-exec-2] audit requestId=a64a1e6e-e3d9-4eef-bfc4-1db306caefe0 AUDIT event="order.processed.audit" actor="demo-user" orderId="2" - Demo audit event
+  21:26:44.359 INFO  [http-nio-8083-exec-2] c.g.s.web.RequestLoggingFilter requestId=a64a1e6e-e3d9-4eef-bfc4-1db306caefe0  event="http.completed" method="POST" route="/api/logging/orders/{orderId}" status="200" elapsedMs="1" - HTTP request completed
+
+  Note: an expected/recoverable failure (IOException caught internally) is
+  logged with WARN and actionable context - no stack trace, because it was
+  handled and doesn't need one.
+
+
+8) POST /api/logging/orders/3?mode=FAILURE
+-------------------------------------------
+Response (HTTP 500):
+  {"detail":"The demo operation failed. Use the requestId to find its logs.","instance":"/api/logging/orders/3","status":500,"title":"Internal Server Error","requestId":"02e1c9d7-1850-45f5-97c9-3037d8acb4b2"}
+
+Console:
+  21:26:44.396 DEBUG [http-nio-8083-exec-6] c.g.s.examples.OrderExamples requestId=02e1c9d7-1850-45f5-97c9-3037d8acb4b2   - Starting order processing orderId=3 mode=FAILURE
+  21:26:44.397 ERROR [http-nio-8083-exec-6] c.g.s.web.LoggingExceptionHandler requestId=02e1c9d7-1850-45f5-97c9-3037d8acb4b2   - Order processing failed; see requestId for related events
+
+  java.lang.IllegalStateException: Simulated order processor failure
+  	at com.gucardev.slf4jlogging.examples.OrderExamples.process(OrderExamples.java:24) ~[!/:0.0.1-SNAPSHOT]
+  	at com.gucardev.slf4jlogging.web.LoggingController.order(LoggingController.java:80) ~[!/:0.0.1-SNAPSHOT]
+  	... (full stack trace continues, %wEx in the pattern keeps it on the ERROR line only)
+
+  21:26:44.408 INFO  [http-nio-8083-exec-6] c.g.s.web.RequestLoggingFilter requestId=02e1c9d7-1850-45f5-97c9-3037d8acb4b2  event="http.completed" method="POST" route="/api/logging/orders/{orderId}" status="500" elapsedMs="14" - HTTP request completed
+
+  Note: the failure is logged exactly once, with the full stack trace, at
+  the exception handler (log.error("...", ex) - throwable last). The
+  service layer that threw does NOT also log it; the requestId in the
+  ProblemDetail response ties the client back to this exact log line.
+
+
+9) POST /api/logging/sensitive  (email + password + accessToken in body)
+--------------------------------------------------------------------------
+Response:
+  {"example":"sensitive","requestId":"4e88526a-a17f-4a1e-a40d-6aa67cdd559c"}
+
+Console:
+  21:26:44.510 INFO  [http-nio-8083-exec-7] c.g.s.examples.SafeLoggingExamples requestId=4e88526a-a17f-4a1e-a40d-6aa67cdd559c  event="login.demo" emailMasked="***@example.com" - Simulated login attempt; no authentication performed
+  21:26:44.510 INFO  [http-nio-8083-exec-7] c.g.s.web.RequestLoggingFilter requestId=4e88526a-a17f-4a1e-a40d-6aa67cdd559c  event="http.completed" method="POST" route="/api/logging/sensitive" status="200" elapsedMs="66" - HTTP request completed
+
+  Note: password and accessToken never reach the logger at all - only a
+  masked email (emailMasked="***@example.com") is logged. The DTO's
+  toString() is also overridden to print "SensitiveRequest[REDACTED]" so
+  that logging the request object by accident can't leak credentials.
+
+
+10) POST /api/logging/safe-text  (body contains \r\n, a fake ERROR line, and a Unicode line separator)
+---------------------------------------------------------------------------------------------------------
+Request body:
+  {"text":"hello\r\nERROR forged log line\tafter tab"}
+
+Response:
+  {"example":"safe-text","requestId":"6a25fada-31c9-450c-a215-e1b3155f1e0d"}
+
+Console:
+  21:26:44.553 INFO  [http-nio-8083-exec-9] c.g.s.examples.SafeLoggingExamples requestId=6a25fada-31c9-450c-a215-e1b3155f1e0d   - User supplied note=hello__ERROR forged log line_after tab
+  21:26:44.554 INFO  [http-nio-8083-exec-9] c.g.s.web.RequestLoggingFilter requestId=6a25fada-31c9-450c-a215-e1b3155f1e0d  event="http.completed" method="POST" route="/api/logging/safe-text" status="200" elapsedMs="6" - HTTP request completed
+
+  Note: this is the log-injection demo. Even though the input contains
+  \r\n and a tab, oneLine() replaces every control character with "_"
+  before logging, so "ERROR forged log line" stays embedded inside the
+  note=... value on a single real log line - it can never masquerade as
+  its own ERROR-level entry. Compare to LoggingExamples.parameterized():
+  placeholders alone (log.info("...{}", text)) do NOT do this sanitizing -
+  oneLine() is what prevents the forged line.
+
+
+11) POST /api/logging/async/1
+------------------------------
+Response:
+  {"jobId":1,"requestId":"7a022a33-a38b-40f8-8ce9-d3fa24115935","threadName":"logging-demo-1"}
+
+Console:
+  21:26:44.595 INFO  [logging-demo-1] c.g.s.async.AsyncLoggingExamples requestId=7a022a33-a38b-40f8-8ce9-d3fa24115935  event="job.completed" jobId="1" - Worker processed demo job
+  21:26:44.596 INFO  [http-nio-8083-exec-1] c.g.s.web.RequestLoggingFilter requestId=7a022a33-a38b-40f8-8ce9-d3fa24115935  event="http.completed" method="POST" route="/api/logging/async/{jobId}" status="200" elapsedMs="6" - HTTP request completed
+
+  Note: the first line runs on thread "logging-demo-1" (the @Async worker
+  pool, see AsyncConfig), not "http-nio-8083-exec-1" (the servlet thread
+  that logs the second line) - yet both lines carry the SAME requestId.
+  That's MdcTaskDecorator: it copies the calling thread's MDC onto the
+  worker thread and restores the worker's own MDC afterwards, so the pool
+  thread is safe to reuse for the next unrelated job.
+
+
+12) Same /structured/1 call, but with --spring.profiles.active=json
+---------------------------------------------------------------------
+With the "json" profile (application-json.yaml: logging.structured.format.console=logstash),
+the exact same log.atInfo().addKeyValue(...) call in LoggingExamples.structured() renders as
+one JSON object per line instead of the %kvp text pattern shown in section 4:
+
+  {"@timestamp":"2026-09-22T21:28:26.328395+03:00","@version":"1","message":"Order preview generated","logger_name":"com.gucardev.slf4jlogging.examples.LoggingExamples","thread_name":"http-nio-8084-exec-1","level":"INFO","level_value":20000,"requestId":"a7d66ed1-f23b-40bc-af1c-45fe03247969","event":"order.previewed","orderId":1,"itemCount":3}
+  {"@timestamp":"2026-09-22T21:28:26.3646417+03:00","@version":"1","message":"HTTP request completed","logger_name":"com.gucardev.slf4jlogging.web.RequestLoggingFilter","thread_name":"http-nio-8084-exec-1","level":"INFO","level_value":20000,"requestId":"a7d66ed1-f23b-40bc-af1c-45fe03247969","event":"http.completed","method":"POST","route":"/api/logging/structured/{orderId}","status":200,"elapsedMs":93}
+
+  Note: no code changes between text and JSON output - only the active
+  Spring profile changes. addKeyValue("orderId", orderId) becomes a real
+  JSON field "orderId":1 (numeric), not a quoted string.
+
+
+13) ./mvnw test
+----------------
+  [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in com.gucardev.slf4jlogging.async.MdcTaskDecoratorTest
+  [INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0 -- in com.gucardev.slf4jlogging.examples.LoggingExamplesTest
+  [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in com.gucardev.slf4jlogging.examples.SafeLoggingExamplesTest
+  [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in com.gucardev.slf4jlogging.Slf4jLoggingApplicationTests
+  [INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0 -- in com.gucardev.slf4jlogging.web.RequestLoggingFilterTest
+  [INFO] Tests run: 22, Failures: 0, Errors: 0, Skipped: 0
+  [INFO] BUILD SUCCESS
