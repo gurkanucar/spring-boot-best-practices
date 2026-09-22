@@ -1,0 +1,10 @@
+logbook:
+  filter:
+    enabled: true
+  strategy: status-at-least
+  minimum-status: 500
+
+logging:
+  level:
+    org.zalando.logbook: TRACE
+    com.gucardev.logbookloggingrequests: INFO

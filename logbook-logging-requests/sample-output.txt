@@ -1,0 +1,184 @@
+logbook-logging-requests - sample run output
+==============================================
+Captured by actually running the app under each profile and calling every
+endpoint with curl. Console lines are Logbook's own TRACE output (via
+org.zalando.logbook.Logbook), shown exactly as produced - not hand-written.
+
+
+0) No active profile (application.yaml defaults: logbook.filter.enabled=false)
+--------------------------------------------------------------------------------
+Request:
+  POST /api/logbook/echo  {"message":"no profile"}
+
+Response:
+  {"message":"no profile","length":10}
+
+Console:
+  (nothing - zero lines mentioning org.zalando.logbook, confirmed by grep)
+
+  Note: this is the whole point of logbook.filter.enabled=false as the
+  default - Logbook is wired into the filter chain but produces no output
+  at all until a profile (dev/prod) turns it on.
+
+
+1) --spring.profiles.active=dev - POST /api/logbook/echo
+------------------------------------------------------------
+Request:
+  POST /api/logbook/echo  {"message":"hello logbook"}
+
+Response:
+  {"message":"hello logbook","length":13}
+
+Console:
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: 994e5df2e247426e
+  Remote: 0:0:0:0:0:0:0:1
+  POST http://localhost:8085/api/logbook/echo HTTP/1.1
+  Accept: */*
+  Content-Length: 27
+  Content-Type: application/json
+  Host: localhost:8085
+  User-Agent: curl/8.12.1
+
+  {"message":"hello logbook"}
+  TRACE ... org.zalando.logbook.Logbook  : Outgoing Response: 994e5df2e247426e
+  Duration: 3 ms
+  HTTP/1.1 200 OK
+  Content-Type: application/json
+  Date: Tue, 22 Sep 2026 19:11:56 GMT
+  Transfer-Encoding: chunked
+
+  {"message":"hello logbook","length":13}
+
+  Note: nothing sensitive here, so nothing is obfuscated - nice baseline
+  to compare against section 2.
+
+
+2) --spring.profiles.active=dev - POST /api/logbook/sensitive
+  (Authorization header + password/apiKey/token in body)
+---------------------------------------------------------------
+Request:
+  POST /api/logbook/sensitive
+  Authorization: Bearer super-secret-jwt
+  {"username":"demo-user","password":"p@ssw0rd","apiKey":"key-12345","token":"tok-67890"}
+
+Response:
+  {"result":"sensitive"}
+
+Console:
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: eb732fc4b8de9894
+  Remote: 0:0:0:0:0:0:0:1
+  POST http://localhost:8085/api/logbook/sensitive HTTP/1.1
+  Accept: */*
+  Authorization: XXX
+  Content-Length: 87
+  Content-Type: application/json
+  Host: localhost:8085
+  User-Agent: curl/8.12.1
+
+  {"username":"demo-user","password":"XXX","apiKey":"XXX","token":"XXX"}
+  TRACE ... org.zalando.logbook.Logbook  : Outgoing Response: eb732fc4b8de9894
+  Duration: 9 ms
+  HTTP/1.1 200 OK
+  Content-Type: application/json
+  Date: Tue, 22 Sep 2026 19:11:56 GMT
+  Transfer-Encoding: chunked
+
+  {"result":"sensitive"}
+
+  Note: Authorization (logbook.obfuscate.headers) and password/apiKey/token
+  (logbook.obfuscate.json-body-fields) are all replaced with "XXX". username
+  is untouched - obfuscation is per-field/per-header, not "hide the whole
+  body". None of this required any code in LogbookController.sensitive() -
+  the controller method body never even inspects these values.
+
+
+3) --spring.profiles.active=dev - GET /api/logbook/status/201 and /status/500
+---------------------------------------------------------------------------------
+Console (both calls, back to back):
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: b093a1383f5b7a7c
+  Remote: 0:0:0:0:0:0:0:1
+  GET http://localhost:8085/api/logbook/status/201 HTTP/1.1
+  Accept: */*
+  Host: localhost:8085
+  User-Agent: curl/8.12.1
+  TRACE ... org.zalando.logbook.Logbook  : Outgoing Response: b093a1383f5b7a7c
+  Duration: 11 ms
+  HTTP/1.1 201 Created
+  ...
+  {"result":"status-201"}
+
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: 8bdfcd3638575c4d
+  Remote: 0:0:0:0:0:0:0:1
+  GET http://localhost:8085/api/logbook/status/500 HTTP/1.1
+  Accept: */*
+  Host: localhost:8085
+  User-Agent: curl/8.12.1
+  TRACE ... org.zalando.logbook.Logbook  : Outgoing Response: 8bdfcd3638575c4d
+  Duration: 2 ms
+  HTTP/1.1 500 Internal Server Error
+  ...
+  {"result":"status-500"}
+
+  Note: in "dev", every request is logged regardless of response status -
+  application-dev.yaml only sets logbook.filter.enabled=true, it does not
+  set a strategy. Compare to section 5 below (prod profile).
+
+
+4) --spring.profiles.active=dev - POST /api/logbook/large (6000-char body)
+------------------------------------------------------------------------------
+Request:
+  POST /api/logbook/large  {"text":"xxx...(6000 x's)...xxx"}   (Content-Length: 6011)
+
+Response:
+  {"result":"received 6000 chars"}
+
+Console (request body line, real capture, shortened here for readability):
+  {"text":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...(4093 more x's)...xxx"...
+
+  Real measured facts (verified byte-for-byte on the actual log line):
+    - full logged body length: 4099 characters
+    - last 3 characters: "..."
+    - 4099 = logbook.write.max-body-size (4096) + 3 ("...")
+
+  Note: Logbook truncates the LOGGED copy of the body at max-body-size and
+  appends "..." - the controller itself still receives and processes the
+  full 6000-character body ("received 6000 chars" in the response proves
+  it). Truncation only affects what ends up in the log.
+
+
+5) --spring.profiles.active=prod - GET /status/{201,404,500,503}
+----------------------------------------------------------------------
+Requests (in order): /status/201, /status/404, /status/500, /status/503
+All four return their requested HTTP status normally to the client.
+
+Console: only 2 "Incoming Request" lines appear (verified by grep -c), for
+exactly the 500 and 503 calls - 201 and 404 produce ZERO log output, not
+even a partial/incomplete entry:
+
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: cd1315ceff808d7d
+  Remote: 0:0:0:0:0:0:0:1
+  GET http://localhost:8085/api/logbook/status/500 HTTP/1.1
+  ...
+
+  TRACE ... org.zalando.logbook.Logbook  : Incoming Request: a00e2262f66ef99a
+  Remote: 0:0:0:0:0:0:0:1
+  GET http://localhost:8085/api/logbook/status/503 HTTP/1.1
+  ...
+
+  Note: application-prod.yaml sets logbook.strategy=status-at-least and
+  logbook.minimum-status=500. Logbook must see the response before it can
+  decide whether to log - so it holds the request/response pair together
+  and only emits BOTH (request + response) once the status turns out to
+  qualify. A 201 or 404 leaves no trace anywhere, by design: this is what
+  keeps a production log from filling up with routine 2xx/4xx traffic
+  while still guaranteeing every 5xx has a full request+response record.
+
+
+6) ./mvnw test
+----------------
+  [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in LogbookLoggingRequestsApplicationTests
+  [INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0 -- in LogbookControllerTest
+  [INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0 -- in LogbookDevProfileLoggingTest
+  [INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0 -- in LogbookProdProfileLoggingTest
+  [INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0
+  [INFO] BUILD SUCCESS

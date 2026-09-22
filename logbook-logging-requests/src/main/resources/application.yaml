@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: logbook-logging-requests
+  mvc:
+    problemdetails:
+      enabled: true
+
+server:
+  port: 8085
+
+logbook:
+  filter:
+    enabled: false
+  format:
+    style: http
+  obfuscate:
+    headers:
+      - Authorization
+      - Cookie
+      - Set-Cookie
+    # Matched by field name anywhere in the JSON tree, on the raw body, so a field the
+    # DTO ignores is still masked.
+    json-body-fields:
+      - password
+      - token
+      - secret
+      - apiKey
+  write:
+    max-body-size: 4096
+  predicate:
+    exclude:
+      - path: /actuator/**
+      - path: /v3/api-docs/**
+      - path: /swagger-ui/**
+      - path: /swagger-ui.html

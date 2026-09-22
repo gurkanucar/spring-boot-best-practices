@@ -1,0 +1,9 @@
+logbook:
+  filter:
+    enabled: true
+
+logging:
+  level:
+    # Logbook's default writer logs at TRACE; without this it stays silent.
+    org.zalando.logbook: TRACE
+    com.gucardev.logbookloggingrequests: DEBUG
