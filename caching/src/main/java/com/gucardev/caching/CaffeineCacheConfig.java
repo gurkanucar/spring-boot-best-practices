@@ -1,20 +1,13 @@
 package com.gucardev.caching;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import java.time.Duration;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
-import java.time.Duration;
-
-/**
- * One in-memory Caffeine {@link CacheManager} per TTL. Each manager creates caches on
- * demand (any cache name from {@link CacheNames}) and expires entries {@code afterWrite}
- * with its own fixed TTL. {@link CacheManagers#CAFFEINE_5M} is {@link Primary}, so it is
- * the fallback when {@code @Cacheable} omits {@code cacheManager}.
- */
 @Configuration
 public class CaffeineCacheConfig {
 
@@ -55,8 +48,10 @@ public class CaffeineCacheConfig {
     }
 
     private CacheManager manager(Duration ttl) {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
-        cacheManager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(ttl));
-        return cacheManager;
+        CaffeineCacheManager manager = new CaffeineCacheManager();
+        manager.setCaffeine(Caffeine.newBuilder()
+                .maximumSize(1_000)
+                .expireAfterWrite(ttl));
+        return manager;
     }
 }

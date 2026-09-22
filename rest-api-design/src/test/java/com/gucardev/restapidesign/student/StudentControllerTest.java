@@ -17,8 +17,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
+import com.gucardev.restapidesign.enrollment.EnrollmentStore;
 
-/** CRUD, pagination/sort, PATCH via JSON Merge Patch, and ETag/If-Match concurrency. */
+/** CRUD, pagination/sort, partial updates with PATCH, and ETag/If-Match concurrency. */
 @SpringBootTest
 @AutoConfigureMockMvc
 class StudentControllerTest {
@@ -30,10 +31,14 @@ class StudentControllerTest {
     private StudentStore store;
 
     @Autowired
+    private EnrollmentStore enrollments;
+
+    @Autowired
     private ObjectMapper objectMapper;
 
     @BeforeEach
     void clearStore() {
+        enrollments.clear();
         store.clear();
     }
 
@@ -143,11 +148,11 @@ class StudentControllerTest {
     }
 
     @Test
-    void patchMergesOnlyMentionedFieldsAndClearsWithExplicitNull() throws Exception {
+    void patchUpdatesOnlySuppliedFieldsAndIgnoresNull() throws Exception {
         long id = createStudent("Jane Smith", "jane@example.com");
 
         mockMvc.perform(patch("/api/v1/students/" + id).header("If-Match", "\"0\"")
-                        .contentType("application/merge-patch+json")
+                        .contentType("application/json")
                         .content("""
                                 { "phoneNumber": "+15550001111" }
                                 """))
@@ -156,35 +161,38 @@ class StudentControllerTest {
                 .andExpect(jsonPath("$.phoneNumber").value("+15550001111"));
 
         mockMvc.perform(patch("/api/v1/students/" + id).header("If-Match", "\"1\"")
-                        .contentType("application/merge-patch+json")
+                        .contentType("application/json")
                         .content("""
                                 { "phoneNumber": null }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.phoneNumber").doesNotExist());
+                .andExpect(jsonPath("$.phoneNumber").value("+15550001111"))
+                .andExpect(jsonPath("$.fullName").value("Jane Smith"));
     }
 
     @Test
-    void patchRejectsExplicitNullOnRequiredField() throws Exception {
+    void patchRejectsBlankFullName() throws Exception {
         long id = createStudent("Jane Smith", "jane@example.com");
 
         mockMvc.perform(patch("/api/v1/students/" + id).header("If-Match", "\"0\"")
-                        .contentType("application/merge-patch+json")
+                        .contentType("application/json")
                         .content("""
-                                { "fullName": null }
+                                { "fullName": " " }
                                 """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    void patchWithoutMergePatchContentTypeIsRejected() throws Exception {
+    void patchAcceptsOrdinaryJsonAndPreservesOtherFields() throws Exception {
         long id = createStudent("Jane Smith", "jane@example.com");
 
         mockMvc.perform(patch("/api/v1/students/" + id).header("If-Match", "\"0\"")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                { "phoneNumber": "+15550001111" }
+                                { "email": "new@example.com" }
                                 """))
-                .andExpect(status().isUnsupportedMediaType());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("new@example.com"))
+                .andExpect(jsonPath("$.fullName").value("Jane Smith"));
     }
 }

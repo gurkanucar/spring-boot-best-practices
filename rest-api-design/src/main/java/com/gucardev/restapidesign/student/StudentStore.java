@@ -2,6 +2,7 @@ package com.gucardev.restapidesign.student;
 
 import com.gucardev.restapidesign.error.ConflictException;
 import com.gucardev.restapidesign.error.ResourceNotFoundException;
+import com.gucardev.restapidesign.error.PreconditionFailedException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -16,7 +17,7 @@ public class StudentStore {
     private final Map<Long, Student> students = new ConcurrentHashMap<>();
     private final AtomicLong idSequence = new AtomicLong();
 
-    public Student create(String fullName, String email) {
+    public synchronized Student create(String fullName, String email) {
         assertEmailAvailable(email, null);
         long id = idSequence.incrementAndGet();
         Student student = new Student(id, fullName, email, null, Student.Status.ACTIVE, 0L, Instant.now());
@@ -40,12 +41,18 @@ public class StudentStore {
         return List.copyOf(students.values());
     }
 
-    public Student replace(Long id, Student updated) {
+    /** Check and write under the same lock, including uniqueness across students. */
+    public synchronized Student replace(Long id, long expectedVersion, Student updated) {
+        Student current = findByIdOrThrow(id);
+        if (current.version() != expectedVersion) {
+            throw new PreconditionFailedException("If-Match does not match the current resource version");
+        }
+        assertEmailAvailable(updated.email(), id);
         students.put(id, updated);
         return updated;
     }
 
-    public void deleteById(Long id) {
+    public synchronized void deleteById(Long id) {
         findByIdOrThrow(id);
         students.remove(id);
     }
@@ -60,7 +67,7 @@ public class StudentStore {
     }
 
     /** Test-only: wipe all state so tests are order-independent. */
-    public void clear() {
+    public synchronized void clear() {
         students.clear();
         idSequence.set(0);
     }

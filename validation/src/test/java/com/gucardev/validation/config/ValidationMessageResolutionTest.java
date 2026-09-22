@@ -56,7 +56,7 @@ class ValidationMessageResolutionTest {
 
     @Test
     void validatorAndLocaleResolverBeansAreRegistered() {
-        assertThat(applicationContext.containsBean("validator")).isTrue();
+        assertThat(applicationContext.getBean(Validator.class)).isSameAs(validator);
         assertThat(applicationContext.containsBean("localeResolver")).isTrue();
 
         LocaleResolver localeResolver = applicationContext.getBean("localeResolver", LocaleResolver.class);

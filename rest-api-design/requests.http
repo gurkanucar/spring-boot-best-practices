@@ -41,29 +41,29 @@ If-Match: "0"
 
 { "fullName": "Jane Doe", "email": "jane@example.com", "phoneNumber": "+15550001111", "status": "ACTIVE" }
 
-### 3. PATCH — merge-patch sets only the mentioned field
+### 3. PATCH — update only phoneNumber
 # Use whatever ETag GET /students/1 currently returns.
 PATCH http://localhost:8080/api/v1/students/1
-Content-Type: application/merge-patch+json
+Content-Type: application/json
 If-Match: "1"
 
 { "phoneNumber": "+15559998888" }
 
-### 3b. PATCH with explicit null — clears phoneNumber
+### 3b. PATCH with explicit null — leaves phoneNumber unchanged
 PATCH http://localhost:8080/api/v1/students/1
-Content-Type: application/merge-patch+json
+Content-Type: application/json
 If-Match: "2"
 
 { "phoneNumber": null }
 
-### 3c. PATCH with explicit null on a required field — 400
+### 3c. PATCH with a blank fullName — 400
 PATCH http://localhost:8080/api/v1/students/1
-Content-Type: application/merge-patch+json
+Content-Type: application/json
 If-Match: "3"
 
-{ "fullName": null }
+{ "fullName": "" }
 
-### 3d. PATCH with the wrong Content-Type — 415
+### 3d. PATCH — update only phoneNumber
 PATCH http://localhost:8080/api/v1/students/1
 Content-Type: application/json
 If-Match: "3"
@@ -95,13 +95,13 @@ POST http://localhost:8080/api/v1/courses/1/publish
 ### 6d. Archive the course
 POST http://localhost:8080/api/v1/courses/1/archive
 
-### 7. PATCH course — clear description with explicit null
+### 7. PATCH course — update only title
 # Use a fresh DRAFT course id and its current ETag.
 PATCH http://localhost:8080/api/v1/courses/1
-Content-Type: application/merge-patch+json
+Content-Type: application/json
 If-Match: "0"
 
-{ "description": null }
+{ "title": "Advanced REST" }
 
 ### 8. Create a fresh student and a small-capacity course for the enrollment flow
 POST http://localhost:8080/api/v1/students

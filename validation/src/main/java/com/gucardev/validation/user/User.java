@@ -1,6 +1,7 @@
 package com.gucardev.validation.user;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.CheckConstraint;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,18 +22,16 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import org.hibernate.annotations.Check;
 
 /**
  * Shows three separate database-level guard layers: DDL constraints, a
- * {@code @Check} constraint, and entity-level jakarta annotations.
+ * {@code @CheckConstraint}, and entity-level jakarta annotations.
  */
 @Entity
 @Table(name = "users", uniqueConstraints = {
         @UniqueConstraint(name = "uk_user_email", columnNames = "email"),
         @UniqueConstraint(name = "uk_user_tckn", columnNames = "tc_kimlik_no")
-})
-@Check(name = "users_age_check", constraints = "age >= 18")
+}, check = @CheckConstraint(name = "users_age_check", constraint = "age >= 18"))
 @Getter
 @Setter
 @NoArgsConstructor

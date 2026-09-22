@@ -9,11 +9,15 @@ import com.gucardev.restapidesign.course.dto.CourseResponse;
 import com.gucardev.restapidesign.enrollment.Enrollment;
 import com.gucardev.restapidesign.enrollment.EnrollmentStore;
 import com.gucardev.restapidesign.error.PreconditionFailedException;
+import com.gucardev.restapidesign.error.ConflictException;
 import com.gucardev.restapidesign.error.PreconditionRequiredException;
 import com.gucardev.restapidesign.student.dto.CreateStudentRequest;
+import com.gucardev.restapidesign.student.dto.PatchStudentRequest;
 import com.gucardev.restapidesign.student.dto.StudentResponse;
 import com.gucardev.restapidesign.student.dto.UpdateStudentRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +37,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.databind.JsonNode;
 
-/** Topic 1 — CRUD, PATCH (JSON Merge Patch), and optimistic concurrency (ETag / If-Match). */
+/** Topic 1 — CRUD, partial updates with PATCH, and optimistic concurrency (ETag / If-Match). */
 @RestController
 @RequestMapping("/api/v1/students")
 public class StudentController {
@@ -48,11 +51,13 @@ public class StudentController {
     private final StudentStore store;
     private final EnrollmentStore enrollments;
     private final CourseStore courses;
+    private final Validator validator;
 
-    public StudentController(StudentStore store, EnrollmentStore enrollments, CourseStore courses) {
+    public StudentController(StudentStore store, EnrollmentStore enrollments, CourseStore courses, Validator validator) {
         this.store = store;
         this.enrollments = enrollments;
         this.courses = courses;
+        this.validator = validator;
     }
 
     @PostMapping
@@ -93,24 +98,32 @@ public class StudentController {
             @Valid @RequestBody UpdateStudentRequest request) {
 
         Student current = requireMatchingVersion(id, ifMatch);
-        store.assertEmailAvailable(request.email(), current.id());
         Student updated = new Student(current.id(), request.fullName(), request.email(),
                 request.phoneNumber(), request.status(), current.version() + 1, current.createdAt());
-        Student saved = store.replace(id, updated);
+        Student saved = store.replace(id, current.version(), updated);
         return ResponseEntity.ok()
                 .eTag(ETagSupport.format(saved.version()))
                 .body(StudentResponse.from(saved));
     }
 
-    @PatchMapping(value = "/{id}", consumes = "application/merge-patch+json")
+    @PatchMapping("/{id}")
     public ResponseEntity<StudentResponse> patch(
             @PathVariable Long id,
             @RequestHeader(value = "If-Match", required = false) String ifMatch,
-            @RequestBody JsonNode patch) {
+            @RequestBody PatchStudentRequest request) {
 
         Student current = requireMatchingVersion(id, ifMatch);
-        Student merged = applyPatch(current, patch);
-        Student saved = store.replace(id, merged);
+        UpdateStudentRequest updated = new UpdateStudentRequest(
+                request.fullName() != null ? request.fullName() : current.fullName(),
+                request.email() != null ? request.email() : current.email(),
+                request.phoneNumber() != null ? request.phoneNumber() : current.phoneNumber(),
+                request.status() != null ? request.status() : current.status());
+        var violations = validator.validate(updated);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        Student saved = store.replace(id, current.version(), new Student(current.id(), updated.fullName(),
+                updated.email(), updated.phoneNumber(), updated.status(), current.version() + 1, current.createdAt()));
         return ResponseEntity.ok()
                 .eTag(ETagSupport.format(saved.version()))
                 .body(StudentResponse.from(saved));
@@ -119,7 +132,14 @@ public class StudentController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
-        store.deleteById(id);
+        // Same monitor as enrollment creation: no new references can appear during deletion.
+        synchronized (enrollments) {
+            store.findByIdOrThrow(id);
+            if (!enrollments.findByStudentId(id).isEmpty()) {
+                throw new ConflictException("Student " + id + " has enrollment history and cannot be deleted");
+            }
+            store.deleteById(id);
+        }
     }
 
     /** Read-only projection over EnrollmentStore — not separately stored data. */
@@ -148,27 +168,4 @@ public class StudentController {
         return current;
     }
 
-    /** RFC 7396 merge: absent field = unchanged, present = new value, explicit null = clear (phoneNumber only). */
-    private Student applyPatch(Student current, JsonNode patch) {
-        String fullName = current.fullName();
-        if (patch.has("fullName")) {
-            if (patch.get("fullName").isNull()) {
-                throw new IllegalArgumentException("fullName cannot be set to null");
-            }
-            fullName = patch.get("fullName").asText();
-        }
-        String email = current.email();
-        if (patch.has("email")) {
-            if (patch.get("email").isNull()) {
-                throw new IllegalArgumentException("email cannot be set to null");
-            }
-            email = patch.get("email").asText();
-            store.assertEmailAvailable(email, current.id());
-        }
-        String phoneNumber = current.phoneNumber();
-        if (patch.has("phoneNumber")) {
-            phoneNumber = patch.get("phoneNumber").isNull() ? null : patch.get("phoneNumber").asText();
-        }
-        return new Student(current.id(), fullName, email, phoneNumber, current.status(), current.version() + 1, current.createdAt());
-    }
 }

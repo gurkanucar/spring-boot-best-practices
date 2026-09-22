@@ -100,24 +100,39 @@ class CourseControllerTest {
     }
 
     @Test
-    void patchClearsDescriptionWithExplicitNullAndRejectsNullTitle() throws Exception {
+    void patchUpdatesOnlyTitleAndRejectsBlankTitle() throws Exception {
         long id = createCourse("Intro", 10);
 
         mockMvc.perform(patch("/api/v1/courses/" + id).header("If-Match", "\"0\"")
-                        .contentType("application/merge-patch+json")
+                        .contentType("application/json")
                         .content("""
-                                { "description": null }
+                                { "title": "Advanced REST" }
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(header().string("ETag", "\"1\""))
-                .andExpect(jsonPath("$.description").doesNotExist());
+                .andExpect(jsonPath("$.title").value("Advanced REST"))
+                .andExpect(jsonPath("$.description").value("d"))
+                .andExpect(jsonPath("$.capacity").value(10))
+                .andExpect(jsonPath("$.status").value("DRAFT"));
 
         mockMvc.perform(patch("/api/v1/courses/" + id).header("If-Match", "\"1\"")
-                        .contentType("application/merge-patch+json")
+                        .contentType("application/json")
                         .content("""
-                                { "title": null }
+                                { "title": " " }
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void patchUpdatesCapacityAndKeepsNullFieldsUnchanged() throws Exception {
+        long id = createCourse("Intro", 10);
+        mockMvc.perform(patch("/api/v1/courses/" + id).header("If-Match", "\"0\"")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":20,\"title\":null,\"description\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(20))
+                .andExpect(jsonPath("$.title").value("Intro"))
+                .andExpect(jsonPath("$.description").value("d"));
     }
 
     @Test

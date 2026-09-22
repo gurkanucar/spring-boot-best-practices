@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.gucardev.validation.config.LocaleConfig;
-import com.gucardev.validation.config.ValidationConfig;
 import com.gucardev.validation.error.ProblemDetailFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,7 +15,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(GroupValidationController.class)
-@Import({ValidationConfig.class, LocaleConfig.class, ProblemDetailFactory.class})
+@Import({LocaleConfig.class, ProblemDetailFactory.class})
 class GroupValidationControllerTest {
 
     @Autowired

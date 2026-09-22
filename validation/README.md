@@ -104,7 +104,7 @@ Since `GlobalExceptionHandler` converts both exceptions into the same
 |---|---|---|---|
 | **DTO validation** | `@Valid @RequestBody` | On every request, before business logic | 400 + field-level error |
 | **Service validation** | `@Validated` class + `@Valid`/`@Min` parameters | Wherever the service is called from (controller, scheduled job, message consumer) | 400 |
-| **Database constraints** | `@Column`, `@UniqueConstraint`, `@Check` | At insert/update time, the last line of defense | 409 |
+| **Database constraints** | `@Column`, `@UniqueConstraint`, `@CheckConstraint` | At insert/update time, the last line of defense | 409 |
 
 ### Why all three?
 

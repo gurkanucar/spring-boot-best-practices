@@ -6,6 +6,7 @@ import com.gucardev.restapidesign.common.PageSupport;
 import com.gucardev.restapidesign.common.SortSupport;
 import com.gucardev.restapidesign.course.dto.CourseResponse;
 import com.gucardev.restapidesign.course.dto.CreateCourseRequest;
+import com.gucardev.restapidesign.course.dto.PatchCourseRequest;
 import com.gucardev.restapidesign.course.dto.UpdateCourseRequest;
 import com.gucardev.restapidesign.enrollment.Enrollment;
 import com.gucardev.restapidesign.enrollment.EnrollmentStore;
@@ -16,6 +17,8 @@ import com.gucardev.restapidesign.student.Student;
 import com.gucardev.restapidesign.student.StudentStore;
 import com.gucardev.restapidesign.student.dto.StudentResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.Validator;
+import jakarta.validation.ConstraintViolationException;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -34,7 +37,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.databind.JsonNode;
 
 /** Topic 2 — CRUD/PATCH/ETag plus business actions (publish/archive) beyond CRUD. */
 @RestController
@@ -49,11 +51,13 @@ public class CourseController {
     private final CourseStore store;
     private final EnrollmentStore enrollments;
     private final StudentStore students;
+    private final Validator validator;
 
-    public CourseController(CourseStore store, EnrollmentStore enrollments, StudentStore students) {
+    public CourseController(CourseStore store, EnrollmentStore enrollments, StudentStore students, Validator validator) {
         this.store = store;
         this.enrollments = enrollments;
         this.students = students;
+        this.validator = validator;
     }
 
     @PostMapping
@@ -100,21 +104,29 @@ public class CourseController {
         Course current = requireMatchingVersion(id, ifMatch);
         Course updated = new Course(current.id(), request.title(), request.description(),
                 request.capacity(), current.status(), current.version() + 1, current.createdAt());
-        Course saved = store.replace(id, updated);
+        Course saved = store.replace(id, current.version(), updated);
         return ResponseEntity.ok()
                 .eTag(ETagSupport.format(saved.version()))
                 .body(CourseResponse.from(saved));
     }
 
-    @PatchMapping(value = "/{id}", consumes = "application/merge-patch+json")
+    @PatchMapping("/{id}")
     public ResponseEntity<CourseResponse> patch(
             @PathVariable Long id,
             @RequestHeader(value = "If-Match", required = false) String ifMatch,
-            @RequestBody JsonNode patch) {
+            @RequestBody PatchCourseRequest request) {
 
         Course current = requireMatchingVersion(id, ifMatch);
-        Course merged = applyPatch(current, patch);
-        Course saved = store.replace(id, merged);
+        UpdateCourseRequest updated = new UpdateCourseRequest(
+                request.title() != null ? request.title() : current.title(),
+                request.description() != null ? request.description() : current.description(),
+                request.capacity() != null ? request.capacity() : current.capacity());
+        var violations = validator.validate(updated);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+        Course saved = store.replace(id, current.version(), new Course(current.id(), updated.title(),
+                updated.description(), updated.capacity(), current.status(), current.version() + 1, current.createdAt()));
         return ResponseEntity.ok()
                 .eTag(ETagSupport.format(saved.version()))
                 .body(CourseResponse.from(saved));
@@ -123,11 +135,13 @@ public class CourseController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@PathVariable Long id) {
-        store.findByIdOrThrow(id);
-        if (enrollments.countActiveByCourse(id) > 0) {
-            throw new ConflictException("Course " + id + " has active enrollments and cannot be deleted");
+        synchronized (enrollments) {
+            store.findByIdOrThrow(id);
+            if (!enrollments.findByCourseId(id).isEmpty()) {
+                throw new ConflictException("Course " + id + " has enrollment history and cannot be deleted");
+            }
+            store.deleteById(id);
         }
-        store.deleteById(id);
     }
 
     @PostMapping("/{id}/publish")
@@ -138,7 +152,7 @@ public class CourseController {
         }
         Course updated = new Course(current.id(), current.title(), current.description(),
                 current.capacity(), Course.Status.PUBLISHED, current.version() + 1, current.createdAt());
-        return CourseResponse.from(store.replace(id, updated));
+        return CourseResponse.from(store.replace(id, current.version(), updated));
     }
 
     @PostMapping("/{id}/archive")
@@ -149,7 +163,7 @@ public class CourseController {
         }
         Course updated = new Course(current.id(), current.title(), current.description(),
                 current.capacity(), Course.Status.ARCHIVED, current.version() + 1, current.createdAt());
-        return CourseResponse.from(store.replace(id, updated));
+        return CourseResponse.from(store.replace(id, current.version(), updated));
     }
 
     /** Read-only projection over EnrollmentStore — not separately stored data. */
@@ -178,26 +192,4 @@ public class CourseController {
         return current;
     }
 
-    /** RFC 7396 merge: absent field = unchanged, present = new value, explicit null = clear (description only). */
-    private Course applyPatch(Course current, JsonNode patch) {
-        String title = current.title();
-        if (patch.has("title")) {
-            if (patch.get("title").isNull()) {
-                throw new IllegalArgumentException("title cannot be set to null");
-            }
-            title = patch.get("title").asText();
-        }
-        String description = current.description();
-        if (patch.has("description")) {
-            description = patch.get("description").isNull() ? null : patch.get("description").asText();
-        }
-        int capacity = current.capacity();
-        if (patch.has("capacity")) {
-            if (patch.get("capacity").isNull()) {
-                throw new IllegalArgumentException("capacity cannot be set to null");
-            }
-            capacity = patch.get("capacity").asInt();
-        }
-        return new Course(current.id(), title, description, capacity, current.status(), current.version() + 1, current.createdAt());
-    }
 }

@@ -3,8 +3,8 @@
 # Spring Cache Best Practices
 
 A teaching project for Spring's `@Cacheable`/`@CachePut`/`@CacheEvict` abstraction:
-fail-safe error handling, an in-memory (Caffeine) + distributed (Redis) cache-manager
-matrix, and a catalog of runnable examples covering the pitfalls that are easy to hit
+fail-safe error handling, in-memory (Caffeine) and distributed (Redis) cache managers,
+and a catalog of runnable examples covering the pitfalls that are easy to hit
 and hard to notice — silent no-ops on non-public methods, self-invocation, and
 polymorphic JSON round-tripping through Redis. No real domain logic; the examples
 return fake data on purpose so the caching behavior itself stays the whole point.
@@ -23,24 +23,39 @@ below. You only need `docker compose up -d` for the Redis-backed examples and fo
 tests in `RedisCachingIntegrationTest` / `SerializationExamplesTest` to have something
 to talk to.
 
-## The cache-manager matrix
+## Cache managers and policies
 
-A cache name (`CacheNames`) is just a logical bucket — it carries no TTL and no opinion
-about storage. The **manager** you pass to `cacheManager = ...` decides both:
+Choose both the backing store and TTL at the call site. Each store has managers
+for `30S`, `1M`, `3M`, `5M`, `10M`, `30M`, and `1H`. `CAFFEINE_5M` is the
+`@Primary` default when a cache annotation omits `cacheManager`.
 
 ```java
-// "users" cache, in Redis, entries live 10 minutes
-@Cacheable(cacheNames = CacheNames.USERS, cacheManager = CacheManagers.REDIS_10M)
+// Local cache: this method's results expire after one minute.
+@Cacheable(cacheNames = CacheNames.USERS, cacheManager = CacheManagers.CAFFEINE_1M)
+public User findLocal(Long id) { ... }
 
-// same logical cache, in-memory Caffeine, entries live 30 seconds
-@Cacheable(cacheNames = CacheNames.USERS, cacheManager = CacheManagers.CAFFEINE_30S)
+// Redis: this method's results expire after five minutes.
+@Cacheable(cacheNames = CacheNames.USERS, cacheManager = CacheManagers.REDIS_5M)
+public User findDistributed(Long id) { ... }
+
+// Use the same manager when updating or evicting that cache.
+@CacheEvict(cacheNames = CacheNames.USERS, cacheManager = CacheManagers.REDIS_5M, key = "#id")
+public void evictDistributed(Long id) { ... }
 ```
 
-`CaffeineCacheConfig` and `RedisCacheConfig` each declare one `CacheManager` bean per
-TTL (30s/1m/3m/5m/10m/30m/1h), all building caches on demand for any name in
-`CacheNames` — adding a new cached thing is just adding a constant, not a new bean.
-`CAFFEINE_5M` is `@Primary`, so it's the fallback if `cacheManager` is omitted.
-Choosing the store and the TTL both live at the call site, not buried in per-cache config.
+Caches are created on demand, so adding a logical cache only requires a name.
+Caffeine caches have a 1,000-entry bound per cache and expire after write.
+Each Caffeine manager owns separate local caches.
+
+Redis managers include their TTL in the key namespace: the same `users` entry
+with key `123` becomes `caching:ttl:60s:users::123` under `REDIS_1M`, and
+`caching:ttl:300s:users::123` under `REDIS_5M`. The application prefix (`caching:`)
+can be overridden with `app.redis.key-prefix`. Different TTL managers therefore
+cannot overwrite or clear each other's entries. When data is cached under multiple
+TTLs, invalidate each relevant manager explicitly (for example with `@Caching`).
+
+The TTL namespace changes the old Redis key format; existing entries are no longer
+read and expire under their previous TTL. This causes a one-time cold cache.
 
 ## Fail-safe error handling
 
@@ -145,6 +160,17 @@ served from cache," since the return value alone can't distinguish the two.
 | `SerializationExamples` + `dto/*` | Redis (de)serialization of a deliberately "confused" nested object: a record containing a `List`, a `Map`, `BigDecimal`, `Instant`, `UUID`, `Optional`, and a polymorphic interface field — see above |
 
 ## Testing notes
+
+Without a running Redis, run the local examples, configuration/serialization checks,
+and outage handling tests with:
+
+```bash
+./mvnw test '-Dtest=*,!RedisCachingIntegrationTest,!SerializationExamplesTest'
+```
+
+For the complete suite, start Redis with `docker compose up -d --wait`, then run
+`./mvnw test`. `CacheConfigurationTest` checks the configured serializer directly;
+the two Redis integration suites additionally verify actual cache reads and writes.
 
 Caffeine-backed tests (`CacheableExamplesTest`, `CacheMutationExamplesTest`,
 `ProgrammaticCacheExamplesTest`, `PublicMethodPitfallTest`, `SelfInvocationTest`) need

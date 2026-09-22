@@ -43,6 +43,13 @@ public class EnrollmentController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public EnrollmentResponse create(@Valid @RequestBody CreateEnrollmentRequest request) {
+        // Shared with parent deletion; capacity and duplicate checks also precede one atomic insert.
+        synchronized (enrollments) {
+            return createEnrollment(request);
+        }
+    }
+
+    private EnrollmentResponse createEnrollment(CreateEnrollmentRequest request) {
         if (!students.existsById(request.studentId())) {
             throw new ResourceNotFoundException("Student " + request.studentId() + " not found");
         }

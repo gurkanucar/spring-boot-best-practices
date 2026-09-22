@@ -1,6 +1,7 @@
 package com.gucardev.restapidesign.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +45,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ProblemDetail> handleNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
         ProblemDetail problem = problems.of(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage(), List.of(), instanceOf(request));
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(problem);
+    }
+
+    /** PATCH validates its merged DTO using the same constraints as PUT. */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ProblemDetail> handleConstraintViolation(
+            ConstraintViolationException ex, HttpServletRequest request) {
+        List<ApiErrorDetail> errors = ex.getConstraintViolations().stream()
+                .map(v -> new ApiErrorDetail(v.getPropertyPath().toString(),
+                        v.getConstraintDescriptor().getAnnotation().annotationType().getSimpleName(),
+                        v.getMessage(), v.getInvalidValue()))
+                .toList();
+        return ResponseEntity.badRequest().body(problems.of(HttpStatus.BAD_REQUEST, "Validation Failed",
+                "The request did not pass validation", errors, instanceOf(request)));
     }
 
     @ExceptionHandler(ConflictException.class)

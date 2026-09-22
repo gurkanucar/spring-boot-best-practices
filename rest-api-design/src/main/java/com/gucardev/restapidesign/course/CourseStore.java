@@ -1,6 +1,7 @@
 package com.gucardev.restapidesign.course;
 
 import com.gucardev.restapidesign.error.ResourceNotFoundException;
+import com.gucardev.restapidesign.error.PreconditionFailedException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -38,18 +39,23 @@ public class CourseStore {
         return List.copyOf(courses.values());
     }
 
-    public Course replace(Long id, Course updated) {
+    /** Version comparison and replacement are one atomic operation. */
+    public synchronized Course replace(Long id, long expectedVersion, Course updated) {
+        Course current = findByIdOrThrow(id);
+        if (current.version() != expectedVersion) {
+            throw new PreconditionFailedException("Resource changed concurrently; fetch it again before retrying");
+        }
         courses.put(id, updated);
         return updated;
     }
 
-    public void deleteById(Long id) {
+    public synchronized void deleteById(Long id) {
         findByIdOrThrow(id);
         courses.remove(id);
     }
 
     /** Test-only: wipe all state so tests are order-independent. */
-    public void clear() {
+    public synchronized void clear() {
         courses.clear();
         idSequence.set(0);
     }

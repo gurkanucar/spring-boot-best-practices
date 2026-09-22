@@ -39,8 +39,8 @@ needs full CRUD; one with its own lifecycle deserves resource status instead.
 | `GET /api/v1/students` | Paginated, sortable list |
 | `GET /api/v1/students/{id}` | Fetch one; sets `ETag` |
 | `PUT /api/v1/students/{id}` | Full replace; requires `If-Match` |
-| `PATCH /api/v1/students/{id}` | Partial update (`application/merge-patch+json`); requires `If-Match` |
-| `DELETE /api/v1/students/{id}` | Remove |
+| `PATCH /api/v1/students/{id}` | Partial update (`application/json`); requires `If-Match` |
+| `DELETE /api/v1/students/{id}` | Remove (blocked by any enrollment history) |
 | `GET /api/v1/students/{id}/courses` | Relationship view: this student's courses |
 | `GET /api/v2/students/{id}` | Versioning demo — see below |
 | `POST /api/v1/courses` | Create (starts `DRAFT`) |
@@ -48,7 +48,7 @@ needs full CRUD; one with its own lifecycle deserves resource status instead.
 | `GET /api/v1/courses/{id}` | Fetch one; sets `ETag` |
 | `PUT /api/v1/courses/{id}` | Full replace (title/description/capacity only — see below); requires `If-Match` |
 | `PATCH /api/v1/courses/{id}` | Partial update; requires `If-Match` |
-| `DELETE /api/v1/courses/{id}` | Remove (blocked if any `ACTIVE` enrollment exists) |
+| `DELETE /api/v1/courses/{id}` | Remove (blocked by any enrollment history) |
 | `POST /api/v1/courses/{id}/publish` | Action: `DRAFT` → `PUBLISHED` |
 | `POST /api/v1/courses/{id}/archive` | Action: `PUBLISHED` → `ARCHIVED` |
 | `GET /api/v1/courses/{id}/students` | Relationship view: students enrolled in this course |
@@ -82,21 +82,27 @@ business-rule conflicts and not-found errors, where `detail` alone carries the m
   student not already `ACTIVE`-enrolled in it.
 - `complete`/`drop` require the enrollment to currently be `ACTIVE`.
 - `publish` only works from `DRAFT`; `archive` only works from `PUBLISHED`.
-- A course with any `ACTIVE` enrollment can't be deleted.
+- Students and courses with any enrollment history (active, completed, or dropped) cannot be deleted; relationship views and history keep valid references.
 
-## PATCH is real JSON Merge Patch (RFC 7396)
+## Partial updates with PATCH
 
-Not an ad-hoc "send only the changed fields" DTO — the actual IETF-standardized
-mechanism. Request `Content-Type: application/merge-patch+json` (a different
-`Content-Type` gets a clean `415`). The merge rule: a field absent from the patch body
-is left unchanged; present with a value replaces it; present as explicit `null` clears
-it — but only for `Student.phoneNumber` and `Course.description`, the two fields where
-"no value" is a legitimate state. Sending explicit `null` for a required field (like
-`fullName`) is a `400`, not a silent no-op.
+Use `Content-Type: application/json` and send only the fields to update:
 
-Records have no setters, so this is implemented as an explicit field-by-field merge
-against a raw `JsonNode`, not Jackson's `readerForUpdating` (which is built for mutable
-beans).
+```http
+PATCH /api/v1/courses/1
+Content-Type: application/json
+If-Match: "0"
+
+{ "title": "New title" }
+```
+
+The controller receives a `PatchCourseRequest` or `PatchStudentRequest` DTO. Only
+non-null fields are applied; omitted and explicit null fields keep their current
+value. To clear an optional field such as description or phoneNumber, use PUT with
+that field set to null. The resulting values are validated with the same rules as
+PUT, so a blank title, invalid email, or non-positive capacity returns 400.
+
+Student status can be patched; Course status still changes via publish/archive.
 
 ## Optimistic concurrency (ETag / If-Match)
 
@@ -106,6 +112,14 @@ beans).
 - Missing → `428 Precondition Required`.
 - Present but stale → `412 Precondition Failed`.
 - Present and current → succeeds, `version` increments, new `ETag` comes back.
+
+The stores recheck the expected version while holding the same lock used for the
+write. Two updates using the same version cannot both succeed. Student email
+uniqueness is also checked inside that lock. This is an in-process guarantee for
+the demo; persistent storage should enforce it with database concurrency controls.
+
+Enrollment creation and parent deletion share an in-process lock so a new enrollment
+cannot appear between the deletion guard and removal of its student or course.
 
 `DELETE` and every Enrollment action skip this on purpose — overwriting someone's
 concurrent edit is the problem this solves; deleting a resource you have a stale
@@ -128,6 +142,9 @@ Versioning is a contract decision, not a duplicated backend.
 `?page=0&size=20&sortBy=title&sortDir=asc`, plus `status` filtering on Course/Enrollment
 and `studentId`/`courseId` on Enrollment. Response shape:
 `{ content, page, size, totalElements, totalPages }`.
+
+`page` must be non-negative and `size` must be between 1 and 100. Out-of-range pages
+return empty content; large offsets are calculated without integer overflow.
 
 Deliberately **not** `?sort=field,dir` as a single value: Spring's default `List<String>`
 binding splits a request parameter on commas, so a single `sort=title,asc` silently
