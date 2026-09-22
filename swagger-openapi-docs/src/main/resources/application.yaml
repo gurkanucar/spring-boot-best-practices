@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: swagger-openapi-docs
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: 8086
+
+app:
+  self-base-url: http://localhost:8086
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true

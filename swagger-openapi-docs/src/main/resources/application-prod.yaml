@@ -1,0 +1,7 @@
+# Never expose the API doc/UI in production - it maps every endpoint, parameter and
+# schema for anyone who requests it.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

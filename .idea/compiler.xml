@@ -20,13 +20,14 @@
         <module name="rest-api-design" />
         <module name="caching" />
       </profile>
-      <profile name="Annotation profile for logbook-logging-requests" enabled="true">
+      <profile name="Annotation profile for swagger-openapi-docs" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
+        <module name="swagger-openapi-docs" />
         <module name="slf4j-logging" />
         <module name="logbook-logging-requests" />
       </profile>
@@ -38,6 +39,7 @@
       <module name="logbook-logging-requests" options="-parameters" />
       <module name="rest-api-design" options="-parameters" />
       <module name="slf4j-logging" options="-parameters" />
+      <module name="swagger-openapi-docs" options="-parameters" />
       <module name="validation" options="-parameters" />
     </option>
   </component>

@@ -1,0 +1,6 @@
+# Docs stay enabled here - QA/staging still needs Swagger UI to explore the API.
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
