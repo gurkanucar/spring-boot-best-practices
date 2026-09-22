@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: jackson
+  mvc:
+    problemdetails:
+      enabled: true
+  jackson:
+    default-property-inclusion: non_null
+    deserialization:
+      fail-on-unknown-properties: false
+    serialization:
+      fail-on-empty-beans: false
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
+
+server:
+  port: 8087
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

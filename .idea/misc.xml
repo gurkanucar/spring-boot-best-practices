@@ -10,6 +10,7 @@
         <option value="$PROJECT_DIR$/slf4j-logging/pom.xml" />
         <option value="$PROJECT_DIR$/logbook-logging-requests/pom.xml" />
         <option value="$PROJECT_DIR$/swagger-openapi-docs/pom.xml" />
+        <option value="$PROJECT_DIR$/jackson/pom.xml" />
       </list>
     </option>
   </component>
