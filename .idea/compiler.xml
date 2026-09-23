@@ -3,6 +3,22 @@
   <component name="CompilerConfiguration">
     <annotationProcessing>
       <profile default="true" name="Default" enabled="true" />
+      <profile name="Maven default annotation processors profile" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <module name="rest-api-design" />
+        <module name="caching" />
+      </profile>
+      <profile name="Annotation profile for quartz-scheduler-shedlock" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="quartz-scheduler-shedlock" />
+      </profile>
       <profile name="Annotation profile for validation" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -11,25 +27,10 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
-        <module name="validation" />
-      </profile>
-      <profile name="Maven default annotation processors profile" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <module name="rest-api-design" />
-        <module name="caching" />
-      </profile>
-      <profile name="Annotation profile for jackson" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
         <module name="swagger-openapi-docs" />
         <module name="jackson" />
         <module name="slf4j-logging" />
+        <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
     </annotationProcessing>
@@ -39,6 +40,7 @@
       <module name="caching" options="-parameters" />
       <module name="jackson" options="-parameters" />
       <module name="logbook-logging-requests" options="-parameters" />
+      <module name="quartz-scheduler-shedlock" options="-parameters" />
       <module name="rest-api-design" options="-parameters" />
       <module name="slf4j-logging" options="-parameters" />
       <module name="swagger-openapi-docs" options="-parameters" />

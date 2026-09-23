@@ -1,0 +1,7 @@
+spring:
+  datasource:
+    # No "./data" prefix here: the TCP server's own -baseDir ./data already resolves
+    # this path, so repeating it would create the file at ./data/data/quartzshedlockdb.
+    url: jdbc:h2:tcp://localhost:9092/quartzshedlockdb;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""

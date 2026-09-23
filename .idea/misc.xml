@@ -11,6 +11,7 @@
         <option value="$PROJECT_DIR$/logbook-logging-requests/pom.xml" />
         <option value="$PROJECT_DIR$/swagger-openapi-docs/pom.xml" />
         <option value="$PROJECT_DIR$/jackson/pom.xml" />
+        <option value="$PROJECT_DIR$/quartz-scheduler-shedlock/pom.xml" />
       </list>
     </option>
   </component>
