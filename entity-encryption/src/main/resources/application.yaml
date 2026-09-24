@@ -1,0 +1,30 @@
+spring:
+  application:
+    name: entity-encryption
+  datasource:
+    url: jdbc:h2:mem:encryptiondb;DB_CLOSE_DELAY=-1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+
+server:
+  port: 8092
+
+app:
+  encryption:
+    # The key that encrypts NEW data. Older keys stay in `keys` so old rows can still be read
+    # until they are re-encrypted (see KeyRotationService).
+    active-key-id: k2
+    # Base64 encoded 256-bit AES keys.
+    # DEV ONLY: these values are public in this repository. In a real system load them from a
+    # secret manager / KMS / environment variables and never commit them.
+    keys:
+      k1: ${ENCRYPTION_KEY_K1:gTTixKPGOd/xo/0DTMVfm89h7BBdKr9cf1YFeR+ee50=}
+      k2: ${ENCRYPTION_KEY_K2:7cf0ABp9PpXgCXwJWrAuurZURT+/I4WHhRe/aZ+uTxk=}
+    # Separate key for the searchable "blind index" (HMAC). Never reuse an encryption key here.
+    blind-index-key: ${ENCRYPTION_BLIND_INDEX_KEY:ITXjVYK3FrytT6HKlSXXbbCFFrJHH6ow3ssq5QGS1dM=}

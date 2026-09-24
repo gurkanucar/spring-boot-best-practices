@@ -16,6 +16,7 @@
         <option value="$PROJECT_DIR$/er-one-to-many/pom.xml" />
         <option value="$PROJECT_DIR$/er-many-to-many/pom.xml" />
         <option value="$PROJECT_DIR$/dto-field-masker/pom.xml" />
+        <option value="$PROJECT_DIR$/entity-encryption/pom.xml" />
       </list>
     </option>
   </component>
