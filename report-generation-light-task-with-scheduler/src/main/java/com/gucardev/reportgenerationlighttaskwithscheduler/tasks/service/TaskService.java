@@ -1,7 +1,12 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config.TaskProperties;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.dto.ClaimedTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.ReportGenerationHandler;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -30,10 +35,11 @@ public class TaskService {
      * task is returned. {@code ON CONFLICT} lets the unique index decide, so this also holds for
      * two concurrent calls.
      *
-     * @param payload ids and small values only; handlers load the data they need
+     * @param payload what the handler takes: an id ({@code reportRequest.getId()}) or a small record.
+     *                Ids and small values only; handlers load the data they need.
      */
     @Transactional
-    public BackgroundTask enqueue(TaskType type, Map<String, Object> payload, String idempotencyKey) {
+    public BackgroundTask enqueue(TaskType type, Object payload, String idempotencyKey) {
         Optional<UUID> insertedId = jdbc.sql("""
                         insert into background_task (id, type, payload, status, run_at, idempotency_key)
                         values (:id, :type, cast(:payload as jsonb), 'PENDING', now(), :idempotencyKey)

@@ -1,9 +1,9 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.report;
 
 import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportService.ReportRequested;
+import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportService.ReportShared;
 import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportService.ReportView;
 import java.net.URI;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -26,6 +26,9 @@ public class ReportController {
     public record ReportRequestBody(String reportType, String requestedBy) {
     }
 
+    public record ShareBody(String recipientEmail) {
+    }
+
     private final ReportService service;
 
     /** The "Export" button. Returns 202 at once; the UI polls {@code reportUrl} until {@code ready}. */
@@ -36,8 +39,14 @@ public class ReportController {
     }
 
     @GetMapping("/{id}")
-    public ReportView get(@PathVariable UUID id) {
+    public ReportView get(@PathVariable Long id) {
         return service.get(id);
+    }
+
+    /** The "Share" button on a finished report: emails it to a colleague in the background. */
+    @PostMapping("/{id}/share")
+    public ResponseEntity<ReportShared> share(@PathVariable Long id, @RequestBody ShareBody body) {
+        return ResponseEntity.accepted().body(service.share(id, body.recipientEmail()));
     }
 
     @ExceptionHandler(TooManyReportRequestsException.class)

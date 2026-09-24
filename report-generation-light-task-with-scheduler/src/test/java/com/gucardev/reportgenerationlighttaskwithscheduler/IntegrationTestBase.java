@@ -3,11 +3,11 @@ package com.gucardev.reportgenerationlighttaskwithscheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.BackgroundTask;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.BackgroundTaskRepository;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskService;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskStatus;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handlers.ReportGenerationHandler;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskStatus;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.ReportGenerationHandler;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
 import java.time.Duration;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;

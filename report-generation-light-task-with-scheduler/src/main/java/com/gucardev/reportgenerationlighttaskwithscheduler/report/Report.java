@@ -18,7 +18,7 @@ public class Report {
     private UUID id;
 
     @Column(name = "report_request_id", nullable = false, unique = true)
-    private UUID reportRequestId;
+    private Long reportRequestId;
 
     @Column(nullable = false)
     private String content;
@@ -26,7 +26,7 @@ public class Report {
     @Column(name = "generated_at", nullable = false)
     private Instant generatedAt;
 
-    public static Report generated(UUID reportRequestId, String content) {
+    public static Report generated(Long reportRequestId, String content) {
         Report report = new Report();
         report.id = UUID.randomUUID();
         report.reportRequestId = reportRequestId;

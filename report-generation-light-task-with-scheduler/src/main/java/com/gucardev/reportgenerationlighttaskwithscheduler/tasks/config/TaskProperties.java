@@ -1,5 +1,6 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;

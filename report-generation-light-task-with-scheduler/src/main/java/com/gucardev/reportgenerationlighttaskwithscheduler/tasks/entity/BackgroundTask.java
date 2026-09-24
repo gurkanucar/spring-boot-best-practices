@@ -1,5 +1,7 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;

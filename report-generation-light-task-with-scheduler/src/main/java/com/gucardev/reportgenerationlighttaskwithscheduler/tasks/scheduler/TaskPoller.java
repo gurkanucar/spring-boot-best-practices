@@ -1,5 +1,9 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.scheduler;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config.TaskProperties;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.dto.ClaimedTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskRunner;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;

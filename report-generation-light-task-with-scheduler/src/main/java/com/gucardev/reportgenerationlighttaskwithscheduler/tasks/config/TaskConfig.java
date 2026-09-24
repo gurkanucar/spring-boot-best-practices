@@ -1,5 +1,6 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.scheduler.TaskPoller;
 import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;

@@ -1,5 +1,6 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;

@@ -27,6 +27,10 @@ curl -i -X POST http://localhost:8099/api/reports -H "Content-Type: application/
 # 202 {"reportRequestId": "...", "taskId": "...", "reportUrl": "/api/reports/..."}
 
 curl http://localhost:8099/api/reports/{reportRequestId}   # "ready": true once generated
+
+# share the finished report with a colleague (409 while it is not ready yet)
+curl -X POST http://localhost:8099/api/reports/{reportRequestId}/share -H "Content-Type: application/json" \
+  -d '{"recipientEmail": "bob@example.com"}'
 ```
 
 **Rate limit.** A user can request at most **3 reports in 10 minutes** (sliding window). The 4th
@@ -59,29 +63,72 @@ idempotency key to the mail provider.
 ## Adding a new task type
 
 1. Add a constant to `TaskType`, e.g. `INVOICE_PDF`.
-2. Write a handler bean:
+2. Write a handler bean. Its generic type is the payload: the runner converts the stored JSON to it
+   before calling `handle`. For a single id, use the id type directly:
 
    ```java
    @Component
-   public class InvoicePdfHandler implements TaskHandler {
+   public class InvoicePdfHandler implements TaskHandler<Long> {
+
        public TaskType type() { return TaskType.INVOICE_PDF; }
 
-       public void handle(JsonNode payload) {
-           UUID invoiceId = Payloads.requireUuid(payload, "invoiceId");
-           // idempotent: return early if the PDF already exists
+       public void handle(Long invoiceId) {
+           // idempotent: return early if the PDF for this invoice already exists
        }
    }
    ```
 
+   Need more than one value? Use a small record instead, e.g.
+   `TaskHandler<InvoicePdfHandler.Payload>` with `record Payload(Long invoiceId, String locale)`.
+
 3. Enqueue it where the work arises, inside that transaction:
 
    ```java
-   taskService.enqueue(TaskType.INVOICE_PDF, Map.of("invoiceId", id.toString()), "invoice-pdf:" + id);
+   taskService.enqueue(TaskType.INVOICE_PDF, invoice.getId(), "invoice-pdf:" + invoice.getId());
    ```
 
 4. Optionally limit it: `tasks.concurrency.INVOICE_PDF: 4` (default: all workers).
 
-Keep payloads small (ids only); the handler loads what it needs.
+Keep payloads small (ids only); the handler loads what it needs. Every value is required: a payload
+that does not fit the handler's type (missing, null, wrong type) makes the task DEAD at once, since
+retrying would not fix it.
+
+The handlers here show the three styles:
+
+| Handler | Payload type | Stored in `background_task.payload` |
+|---|---|---|
+| `ReportGenerationHandler` | `TaskHandler<Long>` (report request id) | `42` |
+| `EmailSendHandler` | `TaskHandler<UUID>` (report id) | `"3f1c…"` |
+| `ReportShareHandler` | `TaskHandler<Payload>`, `record Payload(UUID reportId, String recipientEmail)` | `{"reportId": "3f1c…", "recipientEmail": "…"}` |
+
+## What gets stored
+
+`enqueue` turns the payload into JSON with Jackson and stores that text in the `payload` column
+(`jsonb`), in the caller's transaction. Nothing stays in memory. When the task runs (first time, on a
+retry, after a restart, on another instance), the runner reads the row from the database and
+converts the JSON back into the handler's type before calling `handle`.
+
+Any type that Jackson can write and read back works: `Long`, `UUID`, `String`, enums, `LocalDate`,
+records of these, `List<Long>`... Only data is stored, not Java objects, so:
+
+- pass ids, not entities: the payload is a snapshot from enqueue time, and the handler should load
+  current data itself;
+- renaming a payload record's field breaks tasks that are still waiting with the old name.
+
+## Package layout
+
+```text
+tasks/
+  config/      TaskConfig (worker pool, ShedLock), TaskProperties
+  entity/      BackgroundTask, TaskStatus, TaskType
+  repository/  BackgroundTaskRepository (claim and status updates)
+  dto/         ClaimedTask
+  exception/   NonRetryableTaskException
+  handler/     TaskHandler<P> and its implementations
+  service/     TaskService (enqueue, claim), TaskRunner (execution, retry, backoff)
+  scheduler/   TaskPoller, StuckTaskRecovery (the @Scheduled jobs)
+report/        the demo business code: export request, rate limit, report
+```
 
 ## Configuration
 

@@ -1,4 +1,4 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.exception;
 
 /** Retrying will not help (bad payload, missing data...): the task goes straight to DEAD. */
 public class NonRetryableTaskException extends RuntimeException {

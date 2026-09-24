@@ -1,4 +1,4 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity;
 
 public enum TaskStatus {
 

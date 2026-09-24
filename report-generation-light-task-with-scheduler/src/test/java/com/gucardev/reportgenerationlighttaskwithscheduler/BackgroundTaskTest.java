@@ -10,15 +10,18 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.BackgroundTask;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.StuckTaskRecovery;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskStatus;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskType;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskStatus;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.exception.NonRetryableTaskException;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.ReportGenerationHandler;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.scheduler.StuckTaskRecovery;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
@@ -39,8 +42,13 @@ class BackgroundTaskTest extends IntegrationTestBase {
     @Autowired
     private JsonMapper jsonMapper;
 
+    /** Identity values start at 1, so a large random id never exists. */
+    private static long missingReportRequestId() {
+        return ThreadLocalRandom.current().nextLong(1_000_000_000L, Long.MAX_VALUE);
+    }
+
     private BackgroundTask enqueueReport() {
-        return taskService.enqueue(TaskType.REPORT_GENERATION, Map.of("reportRequestId", UUID.randomUUID().toString()), null);
+        return taskService.enqueue(TaskType.REPORT_GENERATION, missingReportRequestId(), null);
     }
 
     // ---------------------------------------------------------------- happy path
@@ -53,7 +61,7 @@ class BackgroundTaskTest extends IntegrationTestBase {
                 .andExpect(status().isAccepted())
                 .andReturn().getResponse().getContentAsString();
         JsonNode requested = jsonMapper.readTree(response);
-        UUID reportRequestId = UUID.fromString(requested.get("reportRequestId").asString());
+        long reportRequestId = requested.get("reportRequestId").asLong();
         UUID taskId = UUID.fromString(requested.get("taskId").asString());
 
         BackgroundTask task = awaitStatus(taskId, TaskStatus.SUCCEEDED);
@@ -97,13 +105,26 @@ class BackgroundTaskTest extends IntegrationTestBase {
     }
 
     @Test
+    void payloadThatDoesNotFitTheHandlersTypeIsDeadAtOnce() {
+        UUID missing = taskService.enqueue(TaskType.EMAIL_SEND, null, null).getId();
+        UUID wrongType = taskService.enqueue(TaskType.EMAIL_SEND, 42L, null).getId();
+        UUID notAUuid = taskService.enqueue(TaskType.EMAIL_SEND, "not-a-uuid", null).getId();
+
+        for (UUID id : List.of(missing, wrongType, notAUuid)) {
+            BackgroundTask task = awaitStatus(id, TaskStatus.DEAD);
+            assertThat(task.getAttempts()).isEqualTo(1);
+            assertThat(task.getLastError()).contains("Unreadable payload for EMAIL_SEND");
+        }
+    }
+
+    @Test
     void failureOnTheLastAttemptIsDead() {
         doThrow(new IllegalStateException("Still failing")).when(reportHandler).handle(any());
         UUID id = UUID.randomUUID();
         jdbc.sql("""
                         insert into background_task (id, type, payload, status, attempts, max_attempts, run_at)
-                        values (:id, 'REPORT_GENERATION', '{"reportRequestId": "x"}', 'PENDING', 2, 3, now())""")
-                .param("id", id).update();
+                        values (:id, 'REPORT_GENERATION', cast(:payload as jsonb), 'PENDING', 2, 3, now())""")
+                .param("id", id).param("payload", String.valueOf(missingReportRequestId())).update();
 
         BackgroundTask task = awaitStatus(id, TaskStatus.DEAD);
         assertThat(task.getAttempts()).isEqualTo(3);
@@ -148,7 +169,7 @@ class BackgroundTaskTest extends IntegrationTestBase {
 
     @Test
     void idempotencyKeyPreventsDuplicateTasks() {
-        Map<String, Object> payload = Map.of("reportRequestId", UUID.randomUUID().toString());
+        UUID payload = UUID.randomUUID();
         BackgroundTask first = taskService.enqueue(TaskType.EMAIL_SEND, payload, "welcome-email:42");
         BackgroundTask second = taskService.enqueue(TaskType.EMAIL_SEND, payload, "welcome-email:42");
 
@@ -160,7 +181,7 @@ class BackgroundTaskTest extends IntegrationTestBase {
     @Test
     void taskCommitsOnlyTogetherWithTheCallersTransaction() {
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            taskService.enqueue(TaskType.EMAIL_SEND, Map.of("reportRequestId", UUID.randomUUID().toString()),
+            taskService.enqueue(TaskType.EMAIL_SEND, UUID.randomUUID(),
                     "rolled-back");
             status.setRollbackOnly(); // e.g. the business data failed to save
         });
@@ -178,7 +199,7 @@ class BackgroundTaskTest extends IntegrationTestBase {
                         values (:id, 'EMAIL_SEND', cast(:payload as jsonb), 'RUNNING', 2, now() - interval '31 minutes',
                                 now() - interval '30 minutes', 'crashed-instance')""")
                 .param("id", id)
-                .param("payload", "{\"reportRequestId\": \"" + UUID.randomUUID() + "\"}")
+                .param("payload", "\"" + UUID.randomUUID() + "\"")
                 .update();
 
         assertThat(recovery.recoverStuckTasks()).isEqualTo(1);

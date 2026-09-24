@@ -1,11 +1,11 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.report;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.BackgroundTask;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskService;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.TaskType;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.ReportShareHandler;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -16,10 +16,13 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ReportService {
 
-    public record ReportRequested(UUID reportRequestId, UUID taskId, String reportUrl) {
+    public record ReportRequested(Long reportRequestId, UUID taskId, String reportUrl) {
     }
 
-    public record ReportView(UUID reportRequestId, String reportType, String requestedBy, Instant requestedAt,
+    public record ReportShared(UUID taskId) {
+    }
+
+    public record ReportView(Long reportRequestId, String reportType, String requestedBy, Instant requestedAt,
                              boolean ready, Instant generatedAt, String content) {
     }
 
@@ -51,9 +54,24 @@ public class ReportService {
         checkRateLimit(requestedBy);
         ReportRequest request = requests.save(ReportRequest.create(reportType, requestedBy));
         BackgroundTask task = tasks.enqueue(TaskType.REPORT_GENERATION,
-                Map.of("reportRequestId", request.getId().toString()),
+                request.getId(),
                 "report-generation:" + request.getId());
         return new ReportRequested(request.getId(), task.getId(), "/api/reports/" + request.getId());
+    }
+
+    /**
+     * The user clicked "share" on a finished report. Sharing the same report with the same person
+     * again returns the existing task instead of sending a second email.
+     */
+    @Transactional
+    public ReportShared share(Long reportRequestId, String recipientEmail) {
+        Report report = reports.findByReportRequestId(reportRequestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Report " + reportRequestId + " is not ready yet"));
+        BackgroundTask task = tasks.enqueue(TaskType.REPORT_SHARE,
+                new ReportShareHandler.Payload(report.getId(), recipientEmail),
+                "report-share:" + report.getId() + ":" + recipientEmail);
+        return new ReportShared(task.getId());
     }
 
     private void checkRateLimit(String requestedBy) {
@@ -72,7 +90,7 @@ public class ReportService {
     }
 
     @Transactional(readOnly = true)
-    public ReportView get(UUID reportRequestId) {
+    public ReportView get(Long reportRequestId) {
         ReportRequest request = requests.findById(reportRequestId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Report request " + reportRequestId + " not found"));

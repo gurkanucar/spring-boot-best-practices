@@ -2,10 +2,11 @@ package com.gucardev.reportgenerationlighttaskwithscheduler.report;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.UUID;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -17,7 +18,8 @@ import lombok.NoArgsConstructor;
 public class ReportRequest {
 
     @Id
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(name = "report_type", nullable = false)
     private String reportType;
@@ -30,7 +32,6 @@ public class ReportRequest {
 
     public static ReportRequest create(String reportType, String requestedBy) {
         ReportRequest request = new ReportRequest();
-        request.id = UUID.randomUUID();
         request.reportType = reportType;
         request.requestedBy = requestedBy;
         request.createdAt = Instant.now();

@@ -1,5 +1,7 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks;
+package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.dto;
 
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
 import java.util.UUID;
 
 /**
@@ -9,7 +11,7 @@ import java.util.UUID;
  */
 public record ClaimedTask(UUID id, TaskType type, String payload, int attempts, int maxAttempts) {
 
-    static ClaimedTask from(BackgroundTask task) {
+    public static ClaimedTask from(BackgroundTask task) {
         return new ClaimedTask(task.getId(), task.getType(), task.getPayload(), task.getAttempts(), task.getMaxAttempts());
     }
 }

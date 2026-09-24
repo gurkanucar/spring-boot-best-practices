@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ReportRepository extends JpaRepository<Report, UUID> {
 
-    boolean existsByReportRequestId(UUID reportRequestId);
+    boolean existsByReportRequestId(Long reportRequestId);
 
-    Optional<Report> findByReportRequestId(UUID reportRequestId);
+    Optional<Report> findByReportRequestId(Long reportRequestId);
 }
