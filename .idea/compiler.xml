@@ -29,16 +29,17 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for entity-auditing" enabled="true">
+      <profile name="Annotation profile for kafka-inbox-pattern-airports-data-filling-example" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
+        <module name="entity-encryption" />
         <module name="entity-auditing" />
         <module name="rest-api-integration" />
-        <module name="entity-encryption" />
+        <module name="kafka-inbox-pattern-airports-data-filling-example" />
       </profile>
     </annotationProcessing>
   </component>
@@ -52,6 +53,7 @@
       <module name="er-one-to-many" options="-parameters" />
       <module name="er-one-to-one" options="-parameters" />
       <module name="jackson" options="-parameters" />
+      <module name="kafka-inbox-pattern-airports-data-filling-example" options="-parameters" />
       <module name="logbook-logging-requests" options="-parameters" />
       <module name="quartz-scheduler-shedlock" options="-parameters" />
       <module name="rest-api-design" options="-parameters" />

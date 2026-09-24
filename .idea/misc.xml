@@ -19,6 +19,7 @@
         <option value="$PROJECT_DIR$/entity-encryption/pom.xml" />
         <option value="$PROJECT_DIR$/rest-api-integration/pom.xml" />
         <option value="$PROJECT_DIR$/entity-auditing/pom.xml" />
+        <option value="$PROJECT_DIR$/kafka-inbox-pattern-airports-data-filling-example/pom.xml" />
       </list>
     </option>
   </component>

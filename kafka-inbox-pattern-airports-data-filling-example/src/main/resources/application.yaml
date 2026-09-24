@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: kafka-inbox-pattern-airports-data-filling-example
+  datasource:
+    url: jdbc:postgresql://localhost:5434/airports
+    username: airports
+    password: airports
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway (db/migration); Hibernate only checks that the mappings match it.
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: airport-inbox
+      auto-offset-reset: earliest
+      # Offsets are committed by the listener container after the listener returns (see ack-mode).
+      enable-auto-commit: false
+    listener:
+      # Commit each record's offset right after it was stored in the inbox.
+      ack-mode: record
+
+server:
+  port: 8095
+
+app:
+  kafka:
+    airport-events-topic: airport-events
+  inbox:
+    poll-interval: 500ms
+    # A failing event is retried this many times, then marked FAILED for manual inspection.
+    max-attempts: 5
+    retry-backoff: 5s
+    # PROCESSED and SKIPPED rows older than this are deleted by the cleanup job; FAILED rows stay.
+    retention: 7d
+    cleanup-cron: "0 0 3 * * *"

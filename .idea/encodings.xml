@@ -9,6 +9,7 @@
     <file url="file://$PROJECT_DIR$/er-one-to-many/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/er-one-to-one/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/jackson/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/kafka-inbox-pattern-airports-data-filling-example/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/logbook-logging-requests/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/quartz-scheduler-shedlock/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/rest-api-design/src/main/java" charset="UTF-8" />
