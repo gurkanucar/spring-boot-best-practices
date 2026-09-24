@@ -18,6 +18,7 @@
         <option value="$PROJECT_DIR$/dto-field-masker/pom.xml" />
         <option value="$PROJECT_DIR$/entity-encryption/pom.xml" />
         <option value="$PROJECT_DIR$/rest-api-integration/pom.xml" />
+        <option value="$PROJECT_DIR$/entity-auditing/pom.xml" />
       </list>
     </option>
   </component>

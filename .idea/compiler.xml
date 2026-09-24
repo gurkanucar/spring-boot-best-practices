@@ -29,13 +29,14 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for rest-api-integration" enabled="true">
+      <profile name="Annotation profile for entity-auditing" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
+        <module name="entity-auditing" />
         <module name="rest-api-integration" />
         <module name="entity-encryption" />
       </profile>
@@ -45,6 +46,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="caching" options="-parameters" />
       <module name="dto-field-masker" options="-parameters" />
+      <module name="entity-auditing" options="-parameters" />
       <module name="entity-encryption" options="-parameters" />
       <module name="er-many-to-many" options="-parameters" />
       <module name="er-one-to-many" options="-parameters" />

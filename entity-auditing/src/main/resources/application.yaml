@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: entity-auditing
+  datasource:
+    url: jdbc:h2:mem:auditingdb;DB_CLOSE_DELAY=-1
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Creates the audit tables too. In production generate them with Flyway/Liquibase instead.
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      org.hibernate.envers:
+        # Audit table name = entity table + suffix: product -> product_history (default suffix: _AUD).
+        audit_table_suffix: _history
+        # Keep the last state in the audit row of a DELETE (default: only the id, everything else null).
+        store_data_at_delete: true
+        # Adds a REVEND column so "state at revision N" queries do not need a correlated subquery.
+        audit_strategy: validity
+  h2:
+    console:
+      enabled: true
+
+server:
+  port: 8094
