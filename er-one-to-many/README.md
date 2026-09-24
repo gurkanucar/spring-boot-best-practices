@@ -1,0 +1,348 @@
+# Spring Boot One-to-Many Relationship Example
+
+A small **Author ↔ Book** API showing how to model a bidirectional JPA `@OneToMany` /
+`@ManyToOne` relationship properly: which side owns the foreign key, helper methods that
+keep both sides in sync, cascade and orphan removal, the collection N+1 and pagination
+traps, and a feature-oriented package layout with DTOs, validation and consistent error
+responses. It is the sibling of the `er-one-to-one` module and follows the same structure.
+
+Spring Boot 4.1.1 · Java 25 · Spring Data JPA · H2 (in-memory)
+
+## Running
+
+```bash
+cd er-one-to-many
+./mvnw spring-boot:run
+```
+
+- API: http://localhost:8089/api/authors
+- H2 console: http://localhost:8089/h2-console (JDBC URL `jdbc:h2:mem:onetomany`)
+
+The database is recreated on every start (`ddl-auto: create-drop`), and the executed SQL is
+logged so you can watch what each request does.
+
+## Package layout (feature-oriented)
+
+```
+com.gucardev.eronetomany
+├── author/            Author entity, repository, service, controller, mapper
+│   └── dto/           CreateAuthorRequest, UpdateAuthorRequest, AuthorResponse
+├── book/              Book entity, repository, service, controller, mapper
+│   └── dto/           BookRequest, BookResponse
+└── common/error/      ResourceNotFoundException, ConflictException, GlobalExceptionHandler
+```
+
+Each feature owns everything it needs. The two features reference each other because the
+relationship is bidirectional; `AuthorService` is the only cross-feature call the `book`
+feature makes (to load the owning author).
+
+## The relationship
+
+```
+author                     book
++----+------+              +----+-------+------+-----------+
+| id | name |  <---------  | id | title | isbn | author_id |
++----+------+     FK       +----+-------+------+-----------+
+   1 row      1 : N                                NOT NULL
+```
+
+| | `Book` (owning side, "many") | `Author` (inverse side, "one") |
+|---|---|---|
+| Mapping | `@ManyToOne(fetch = LAZY)` + `@JoinColumn(name = "author_id", nullable = false)` | `@OneToMany(mappedBy = "author", cascade = ALL, orphanRemoval = true)` |
+| Owns the FK column | yes | no |
+| Meaning | a book cannot exist without an author | an author may have zero or more books |
+
+Key points:
+
+- **The "many" side owns the foreign key.** Only changes made through `Book.author` are
+  written to the database; `Author.books` is a read mirror (`mappedBy`). Without `mappedBy`
+  Hibernate would create a separate join table.
+- **`@ManyToOne` is `EAGER` by default**, which silently joins the author into every book
+  query. It is set to `LAZY` here.
+- **`cascade = ALL`**: saving an author saves its books, deleting an author deletes them.
+- **`orphanRemoval = true`**: removing a book from `author.books` deletes its row. Without it,
+  `removeBook` would try to set `author_id = null` and fail on the `NOT NULL` foreign key.
+
+## Helper methods
+
+Both sides hold a reference, so changing only one leaves the object graph inconsistent.
+`Author` exposes helpers that always update both, and hides the raw collection:
+
+```java
+public Set<Book> getBooks() {              // read-only view
+    return Collections.unmodifiableSet(books);
+}
+
+public void addBook(Book book) {           // author.books += book, book.author = author
+    books.add(book);
+    book.setAuthor(this);
+}
+
+public void removeBook(Book book) {        // both sides cleared; orphanRemoval deletes the row
+    books.remove(book);
+    book.setAuthor(null);
+}
+```
+
+`getBooks()` returns an unmodifiable set and `setBooks` is not generated, so the only way to
+change the association is through the helpers. Unit-tested in `AuthorTest`.
+
+## Endpoints
+
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/authors` | Create an author, optionally with books | `201` + `Location` | `400` validation, `409` duplicate ISBN |
+| `GET` | `/api/authors` | Page of authors with their books (`?page=&size=&sort=`) | `200` | |
+| `GET` | `/api/authors/fetch-join` | Same as the list, via ids-first + fetch join (see "Query performance") | `200` | |
+| `GET` | `/api/authors/summaries` | Lightweight rows: `id`, `name`, `bookCount` (DTO projection) | `200` | |
+| `GET` | `/api/authors/{id}` | Get one author with books | `200` | `404` |
+| `PUT` | `/api/authors/{id}` | Update the author's name (books untouched) | `200` | `400`, `404` |
+| `DELETE` | `/api/authors/{id}` | Delete the author; books are cascaded | `204` | `404` |
+| `GET` | `/api/authors/{authorId}/books` | Page of the author's books (`?page=&size=&sort=`) | `200` | `404` |
+| `GET` | `/api/authors/{authorId}/books/after` | Keyset (cursor) page: `?afterId=<nextCursor>&size=` | `200` | `404` |
+| `POST` | `/api/authors/{authorId}/books` | Add a book to the author | `201` + `Location` | `400`, `404`, `409` |
+| `PUT` | `/api/authors/{authorId}/books/{bookId}` | Update a book | `200` | `400`, `404`, `409` |
+| `DELETE` | `/api/authors/{authorId}/books/{bookId}` | Remove a book, keep the author | `204` | `404` |
+| `GET` | `/api/books/{bookId}` | Get a book and its author's id | `200` | `404` |
+
+Book routes are nested under the author, and update/delete require the book to belong to
+that author (a wrong pair returns `404`, so one author cannot modify another's books).
+
+### Try it
+
+```bash
+# author + books in one request
+curl -i -X POST localhost:8089/api/authors -H 'Content-Type: application/json' \
+  -d '{"name":"Orwell","books":[{"title":"1984","isbn":"ISBN-1"},{"title":"Animal Farm","isbn":"ISBN-2"}]}'
+
+# add, update and remove a single book
+curl -i -X POST localhost:8089/api/authors/1/books -H 'Content-Type: application/json' \
+  -d '{"title":"Homage to Catalonia","isbn":"ISBN-3"}'
+curl -X PUT localhost:8089/api/authors/1/books/3 -H 'Content-Type: application/json' \
+  -d '{"title":"Homage to Catalonia (2nd ed.)","isbn":"ISBN-3"}'
+curl -X DELETE localhost:8089/api/authors/1/books/3
+
+# read, page through the books, navigate from the book side
+curl localhost:8089/api/authors/1
+curl 'localhost:8089/api/authors/1/books?size=1&sort=title'
+curl localhost:8089/api/books/1
+```
+
+Example response:
+
+```json
+{
+  "id": 1,
+  "name": "Orwell",
+  "books": [
+    { "id": 1, "title": "1984", "isbn": "ISBN-1", "authorId": 1 },
+    { "id": 2, "title": "Animal Farm", "isbn": "ISBN-2", "authorId": 1 }
+  ]
+}
+```
+
+Errors are RFC 9457 `ProblemDetail` bodies. Validation errors carry an `errors` array such
+as `"books[0].title: must not be blank"`.
+
+## Where does `join fetch` (and friends) go?
+
+The most common confusion. There are two different questions, and they live in two
+different places:
+
+1. **What is the default loading behavior of this relationship?** Answered once, in the
+   **entity mapping**.
+2. **What does this particular use case need loaded?** Answered per use case, on the
+   **repository method** that serves it.
+
+The service and controller never contain fetch instructions. The service only decides
+*which repository method* to call, inside a `@Transactional` method, and maps the result to
+a DTO before the transaction ends.
+
+```
+Entity            -> default: everything LAZY (+ @BatchSize as a safety net)
+Repository method -> per use case: @EntityGraph, join fetch, or a DTO projection
+Service           -> picks the repository method, maps entity to DTO inside @Transactional
+Controller        -> only sees DTOs
+```
+
+### The tools, and where each one goes
+
+| Tool | Where it goes | What it does | Use it for |
+|---|---|---|---|
+| `fetch = LAZY` | Entity, on `@ManyToOne` / `@OneToOne` (collections are already lazy) | Loads the association only when first accessed | **Always.** Never use `EAGER`: it cannot be turned off per query, so every query pays for it |
+| `@BatchSize` | Entity, on the collection field (or globally via `hibernate.default_batch_fetch_size`) | When a lazy collection is touched, load it for up to N parents at once (`where author_id in (...)`) | Default protection against N+1 on **paginated lists** |
+| `@EntityGraph` | Repository method (derived query, `@Query`, or an overridden `findById`) | "Run this same query, but also fetch these associations" | Simplest way to fetch an association for one use case, no JPQL needed. Used on `AuthorRepository.findById` |
+| `join fetch` | Repository method, inside a `@Query` JPQL string | Same effect as an entity graph, but you write the whole query | When you already need custom JPQL: filters, ordering, `in :ids`. Used in `findAllWithBooksByIdIn` |
+| DTO projection (`select new ...`) | Repository method, inside a `@Query` | Selects only the columns you need; no entities, no lazy loading possible | Read-only lists and screens. Used in `findSummaries` and `findNextPage` |
+| `@NamedEntityGraph` | Entity class, referenced with `@EntityGraph("name")` on repository methods | A reusable, named entity graph | Only when many repository methods need the identical graph |
+
+`@EntityGraph` vs `join fetch` do the same thing (one SQL join). Pick `@EntityGraph` when the
+query is a simple derived one, `join fetch` when you are writing JPQL anyway.
+
+### Which one do I use? (decision guide)
+
+```
+Do I need managed entities (I will modify them), or only read data?
+├── Only read, and only some fields/aggregates  ->  DTO projection      (findSummaries)
+└── Need entities
+    ├── One parent (findById)                   ->  @EntityGraph        (AuthorRepository.findById)
+    ├── A list, NOT paginated                   ->  join fetch or @EntityGraph
+    └── A list, paginated
+        ├── Fetching a to-one (@ManyToOne)      ->  join fetch / @EntityGraph is fine with Pageable
+        └── Fetching a collection (@OneToMany)  ->  NEVER fetch-join + Pageable. Use either:
+              - @BatchSize on the collection    (GET /api/authors)
+              - ids first, then join fetch      (GET /api/authors/fetch-join)
+```
+
+### Rules and pitfalls
+
+- **`join` is not `join fetch`.** `left join a.books b` only lets you filter or aggregate on
+  books; the `Author.books` collection is still lazy. Only `join fetch` (or an entity graph)
+  fills it.
+- **Do not filter the fetched collection.** `... join fetch a.books b where b.title = 'x'`
+  returns authors whose `books` collection contains *only* the matching books. The entity
+  now lies about its own state. Filter on the root, or use a DTO projection.
+- **Fetch join a collection + `Pageable` = in-memory paging.** See "Ids first, then fetch
+  join" below. To-one fetch joins (`Book` → `author`) paginate fine because they do not
+  multiply rows.
+- **Only one `List` (bag) can be fetch-joined per query**, otherwise Hibernate throws
+  `MultipleBagFetchException`. Using `Set`s avoids the exception but produces a cartesian
+  product of both collections. Fetch one collection per query instead.
+- **A `@Query` with `join fetch` needs an explicit `countQuery` when used with `Page`**;
+  Spring Data cannot derive a valid count query from a fetch join.
+- **Fetching happens inside the transaction.** With `open-in-view: false`, touching a lazy
+  association after the service method returns throws `LazyInitializationException`. That is
+  the intended safety net: fix it by fetching in the repository, not by re-enabling open-in-view.
+
+## Query performance: pagination, fetch joins, projections
+
+Four ways to read authors and their books, each with a different cost. The numbers below are
+SQL statements per request, asserted with Hibernate statistics in `QueryPerformanceTest`
+(30 authors, 2 books each, page size 20 so the count query runs).
+
+| Strategy | Endpoint | SQL statements | Loads | Use when |
+|---|---|---|---|---|
+| Naive lazy loading (for contrast) | not implemented | 1 + 1 + **20** (N+1) | entities | never |
+| `@BatchSize` on the collection | `GET /api/authors` | 3: page, count, 1 batched `author_id in (...)` | entities | you need entities; simplest option |
+| Ids first, then fetch join | `GET /api/authors/fetch-join` | 3: ids page, count, 1 fetch join | entities | you need entities and want one join instead of a batch |
+| DTO projection | `GET /api/authors/summaries` | 2: rows, count | no entities | list screens that only need a few columns or aggregates |
+| Keyset pagination | `GET /api/authors/{id}/books/after` | 2 per page: existence check, 1 keyset query; no count | DTOs | infinite scroll, very large tables, deep pages |
+
+### Ids first, then fetch join
+
+You cannot simply write `select a from Author a left join fetch a.books` and paginate it:
+the join multiplies rows, so SQL `LIMIT` would cut through an author's books, and Hibernate
+falls back to loading everything and paging in memory (`HHH90003004`). The two-step pattern
+avoids that (`AuthorRepository.findPageOfIds` + `findAllWithBooksByIdIn`):
+
+1. Paginate only the author **ids** in the database (`select a.id from Author a` + sort + limit).
+2. Load those authors with `left join fetch a.books where a.id in :ids` (no `LIMIT`, so
+   nothing to slice) and put them back in the id page's order.
+
+### DTO projection
+
+`AuthorRepository.findSummaries` selects `new AuthorSummary(a.id, a.name, count(b))` with a
+`group by`. The database counts the books; no `Author`/`Book` entity is created, nothing is
+tracked in the persistence context (`getEntityLoadCount() == 0` in the test), and no
+collection is touched. Note the explicit `countQuery`: Spring Data cannot derive a correct
+count from a `group by` query.
+
+### Keyset (cursor) pagination
+
+`OFFSET n` makes the database read and throw away `n` rows, so page 100,000 is slow.
+Keyset pagination remembers the last id instead:
+
+```sql
+select b.id, b.title, b.isbn, b.author_id from book b
+where b.author_id = ? and b.id > ?     -- ? = the cursor from the previous page
+order by b.id
+fetch first ? rows only                 -- page size + 1
+```
+
+It uses the primary key index, costs the same on every page, and is stable when rows are
+inserted while a client is paging. Two more details: the page size + 1 trick (one extra row
+tells you whether a next page exists) replaces the `count(*)` query, and `b.author.id`
+reads the foreign key column without joining `author`. The trade-off is that clients can only
+move forward, not jump to page 47.
+
+```bash
+curl 'localhost:8089/api/authors/1/books/after?size=2'            # first page
+curl 'localhost:8089/api/authors/1/books/after?size=2&afterId=2'  # next: afterId = nextCursor
+# {"items":[...],"nextCursor":2}   nextCursor is null on the last page
+```
+
+### Other performance levers (not implemented here)
+
+- `Slice` instead of `Page` skips the count query when you only need "is there a next page".
+- `spring.jpa.properties.hibernate.default_batch_fetch_size=50` applies batch fetching to all
+  lazy associations globally, instead of per collection with `@BatchSize`.
+- `@Transactional(readOnly = true)` (used on every read here) lets Hibernate skip dirty checking.
+- Insert batching (`hibernate.jdbc.batch_size`) is silently disabled by
+  `GenerationType.IDENTITY`; use a `SEQUENCE` generator on databases that support it if you
+  bulk-insert.
+- Check the SQL, not your intuition: `generate_statistics` (as in the test) or
+  `show-sql: true` (enabled in `application.yaml`) tells you the real statement count.
+
+## Design notes and gotchas
+
+**Entities never leave the service layer.** Controllers accept and return DTOs (records);
+mappers convert in the service, inside the transaction. `spring.jpa.open-in-view` is
+`false`, so a lazy collection touched in a controller fails loudly instead of silently
+querying the database during view rendering.
+
+**Collections are lazy, so N+1 is the default trap.** Listing authors and then reading
+`author.getBooks()` for each one runs one `select ... from book where author_id = ?` per
+author. Two different fixes are used, on purpose:
+
+- *Single author* (`findById`): `@EntityGraph(attributePaths = "books")` fetches the author
+  and books in one join.
+- *Paged list* (`findAll(Pageable)`): `@BatchSize(size = 50)` on the collection. Hibernate
+  loads the page of authors, then fetches the books of up to 50 authors in one
+  `where author_id in (...)` query: 2 queries instead of N+1.
+
+**Never fetch-join a collection and paginate.** A join on a collection multiplies rows, so
+SQL `LIMIT` would cut through an author's books. Hibernate falls back to loading everything
+and paginating in memory (warning `HHH90003004`). That is why the paged list does not use an
+entity graph.
+
+**Paginate the children in the database.** `GET /authors/{id}/books` uses
+`BookRepository.findByAuthorId(id, pageable)` instead of `author.getBooks()`, so an author
+with 100,000 books never loads them all.
+
+**`Set` and `equals`/`hashCode`.** `Author.books` is a `Set`, and `Book` deliberately keeps
+the default identity `equals`/`hashCode`. That is correct for managed entities inside one
+transaction, which is all this app does. An id-based `equals` breaks before persist (id is
+`null`), and a field-based one breaks when the field is edited while the book is in the set.
+If you compare detached entities, use a business key (here: `isbn`).
+
+**Removing a book loads the collection.** `BookService.remove` finds the book inside
+`author.getBooks()` so `removeBook` can update both sides and `orphanRemoval` can fire. That
+is fine for modest collections; for very large ones, delete by id with a repository query
+instead. For the same reason, deleting an author loads and deletes its books one by one
+rather than in a single `DELETE ... WHERE author_id = ?`.
+
+**Uniqueness is checked twice.** The service checks `isbn` up front (including duplicates
+inside one create request) for a clean `409` message; the `unique` column constraint plus a
+`DataIntegrityViolationException` handler is the safety net for concurrent requests.
+
+**Alternatives to know about** (not used here):
+
+- *Unidirectional `@OneToMany`* (no `mappedBy`, no `Book.author`) makes Hibernate create a
+  join table or issue extra `UPDATE`s to set the foreign key. Prefer the bidirectional
+  mapping shown here, or a unidirectional `@ManyToOne` on `Book` only.
+- *`@ManyToOne` only* (drop `Author.books`): the simplest model. Every "books of an author"
+  read is a repository query, which also avoids all collection pitfalls above.
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+- `AuthorTest` — the helper methods keep both sides consistent and the collection is
+  read-only from outside.
+- `QueryPerformanceTest` — asserts the exact number of SQL statements (and entities loaded)
+  for the batch-fetch, ids-first fetch-join, DTO projection and keyset strategies.
+- `AuthorBookApiTest` — full stack (MockMvc + H2): create with/without books, validation,
+  duplicate ISBN handling, list, update, cascade delete, add/page/update/remove books,
+  wrong-author `404`s, orphan removal, lookup from the book side.

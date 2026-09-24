@@ -141,7 +141,8 @@ silently querying the database during view rendering.
 runs one extra `select ... from id_card where person_id = ?` per person (N+1).
 `PersonRepository` fixes this with `@EntityGraph(attributePaths = "idCard")` on `findAll`
 and `findById`, which turns it into a single join. The owning side (`IDCard.person`) *can*
-be lazy, and is.
+be lazy, and is. (Not sure where `@EntityGraph` vs `join fetch` belongs? See "Where does
+`join fetch` (and friends) go?" in the `er-one-to-many` README.)
 
 **Replacing a card updates it in place.** `PUT .../id-card` on a person who already has a
 card mutates that row instead of removing it and assigning a new `IDCard`. Hibernate
