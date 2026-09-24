@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: report-generation-light-task-with-scheduler
+  datasource:
+    url: jdbc:postgresql://localhost:5434/reports
+    username: reports
+    password: reports
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway (db/migration); Hibernate only checks that the mappings match it.
+      ddl-auto: validate
+
+server:
+  port: 8099
+
+tasks:
+  poll-interval: 2s
+  # Worker threads per instance. The poller never claims more tasks than there are free workers.
+  workers: 16
+  # Maximum tasks of a type running at once on one instance. Unlisted types may use all workers.
+  concurrency:
+    REPORT_GENERATION: 2
+    EMAIL_SEND: 30
+  # RUNNING longer than this counts as stalled (crashed instance) and is rescheduled.
+  # Must be longer than the slowest task, or a still-running task is started a second time.
+  stuck-after: 20m
+  shutdown-wait: 60s
+  # instance-id: defaults to hostname + random suffix
+
+reports:
+  # Protects against repeated export clicks: at most 3 requests per user in 10 minutes.
+  rate-limit:
+    max-requests: 3
+    window: 10m

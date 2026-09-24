@@ -13,6 +13,7 @@
     <file url="file://$PROJECT_DIR$/kafka-outbox-pattern-flight-data-updates-example/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/logbook-logging-requests/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/quartz-scheduler-shedlock/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/report-generation-light-task-with-scheduler/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/rest-api-design/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/rest-api-integration/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/slf4j-logging/src/main/java" charset="UTF-8" />
