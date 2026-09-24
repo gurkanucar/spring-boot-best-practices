@@ -1,0 +1,6 @@
+spring:
+  application:
+    name: dto-field-masker
+
+server:
+  port: 8091
