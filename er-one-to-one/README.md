@@ -1,0 +1,171 @@
+# Spring Boot One-to-One Relationship Example
+
+A small **Person ↔ IDCard** API showing how to model a bidirectional JPA `@OneToOne`
+relationship properly: which side owns the foreign key, helper methods that keep both
+sides in sync, cascade and orphan removal, the N+1 trap on the inverse side, and a
+feature-oriented package layout with DTOs, validation and consistent error responses.
+
+Spring Boot 4.1.1 · Java 25 · Spring Data JPA · H2 (in-memory)
+
+## Running
+
+```bash
+cd er-one-to-one
+./mvnw spring-boot:run
+```
+
+- API: http://localhost:8088/api/persons
+- H2 console: http://localhost:8088/h2-console (JDBC URL `jdbc:h2:mem:onetoone`)
+
+The database is recreated on every start (`ddl-auto: create-drop`), and the executed SQL is
+logged so you can watch what each request does.
+
+## Package layout (feature-oriented)
+
+```
+com.gucardev.eronetoone
+├── person/            Person entity, repository, service, controller, mapper
+│   └── dto/           CreatePersonRequest, UpdatePersonRequest, PersonResponse
+├── idcard/            IDCard entity, repository, service, controller, mapper
+│   └── dto/           IDCardRequest, IDCardResponse
+└── common/error/      ResourceNotFoundException, ConflictException, GlobalExceptionHandler
+```
+
+Each feature owns everything it needs. The two features reference each other because the
+relationship is bidirectional; `PersonService` is the only cross-feature call the `idcard`
+feature makes (to load the owning person).
+
+## The relationship
+
+```
+person                     id_card
++----+------+              +----+-------------+-------------+-----------+
+| id | name |  <---------  | id | card_number | expiry_date | person_id |
++----+------+     FK       +----+-------------+-------------+-----------+
+                                                             UNIQUE, NOT NULL
+```
+
+| | `IDCard` (owning side) | `Person` (inverse side) |
+|---|---|---|
+| Mapping | `@OneToOne(fetch = LAZY)` + `@JoinColumn(name = "person_id", nullable = false, unique = true)` | `@OneToOne(mappedBy = "person", cascade = ALL, orphanRemoval = true)` |
+| Owns the FK column | yes | no |
+| Meaning | a card cannot exist without a person | a person may or may not have a card |
+
+Key points:
+
+- **`unique = true` on the join column** is what makes it truly one-to-one. Without it the
+  schema is really many-to-one and the database would happily accept two cards per person.
+- **The owning side is the one with the FK.** Only changes made through `IDCard.person`
+  are written to the database; `Person.idCard` is a read mirror (`mappedBy`).
+- **`cascade = ALL`**: saving a person saves the card, deleting a person deletes the card.
+- **`orphanRemoval = true`**: removing the reference (`person.removeIdCard()`) deletes the
+  card row on flush. `cascade` alone would not do this.
+
+## Helper methods
+
+Because both sides hold a reference, changing one side only leaves the object graph
+inconsistent. `Person` exposes two helpers that always update both:
+
+```java
+public void assignIdCard(IDCard card) {   // person.idCard = card, card.person = person
+    if (card == null) { removeIdCard(); return; }
+    card.setPerson(this);
+    this.idCard = card;
+}
+
+public void removeIdCard() {              // both sides cleared; orphanRemoval deletes the row
+    if (this.idCard != null) {
+        this.idCard.setPerson(null);
+        this.idCard = null;
+    }
+}
+```
+
+`Person.setIdCard` is deliberately not generated (`@Setter(AccessLevel.NONE)`), so the only
+way to change the association is through the helpers. Unit-tested in `PersonTest`.
+
+## Endpoints
+
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/persons` | Create a person, optionally with a card | `201` + `Location` | `400` validation, `409` duplicate card number |
+| `GET` | `/api/persons` | Page of persons with their cards (`?page=&size=&sort=`) | `200` | |
+| `GET` | `/api/persons/{id}` | Get one person with the card | `200` | `404` |
+| `PUT` | `/api/persons/{id}` | Update the person's name (card untouched) | `200` | `400`, `404` |
+| `DELETE` | `/api/persons/{id}` | Delete the person; the card is cascaded | `204` | `404` |
+| `GET` | `/api/persons/{personId}/id-card` | Get the person's card | `200` | `404` (no person / no card) |
+| `PUT` | `/api/persons/{personId}/id-card` | Create the card, or update it in place | `201` created / `200` updated | `400`, `404`, `409` |
+| `DELETE` | `/api/persons/{personId}/id-card` | Remove the card, keep the person | `204` | `404` |
+| `GET` | `/api/id-cards/{cardNumber}` | Look up a card, and its owner's id, by number | `200` | `404` |
+
+### Try it
+
+```bash
+# person + card in one request
+curl -i -X POST localhost:8088/api/persons -H 'Content-Type: application/json' \
+  -d '{"name":"Ada","idCard":{"cardNumber":"TR-001","expiryDate":"2099-01-01"}}'
+
+# person without a card, then attach one later
+curl -X POST localhost:8088/api/persons -H 'Content-Type: application/json' -d '{"name":"Bob"}'
+curl -i -X PUT localhost:8088/api/persons/2/id-card -H 'Content-Type: application/json' \
+  -d '{"cardNumber":"TR-002","expiryDate":"2099-01-01"}'
+
+# read, navigate from the card side, remove the card only
+curl localhost:8088/api/persons/1
+curl localhost:8088/api/id-cards/TR-001
+curl -X DELETE localhost:8088/api/persons/1/id-card
+```
+
+Example response:
+
+```json
+{
+  "id": 1,
+  "name": "Ada",
+  "idCard": { "id": 1, "cardNumber": "TR-001", "expiryDate": "2099-01-01", "personId": 1 }
+}
+```
+
+Errors are RFC 9457 `ProblemDetail` bodies. Validation errors carry an `errors` array such
+as `"idCard.expiryDate: must be a future date"`.
+
+## Design notes and gotchas
+
+**Entities never leave the service layer.** Controllers accept and return DTOs (records);
+mappers convert in the service, inside the transaction. `spring.jpa.open-in-view` is
+`false`, so a lazy association touched in a controller would fail loudly instead of
+silently querying the database during view rendering.
+
+**The inverse side cannot be lazy.** Hibernate has to query `id_card` to know whether
+`person.idCard` is `null` or an object, so it loads it eagerly. Listing persons naively
+runs one extra `select ... from id_card where person_id = ?` per person (N+1).
+`PersonRepository` fixes this with `@EntityGraph(attributePaths = "idCard")` on `findAll`
+and `findById`, which turns it into a single join. The owning side (`IDCard.person`) *can*
+be lazy, and is.
+
+**Replacing a card updates it in place.** `PUT .../id-card` on a person who already has a
+card mutates that row instead of removing it and assigning a new `IDCard`. Hibernate
+flushes inserts before deletes, so the swap approach would insert the new card while the
+old one still occupies the unique `person_id` and fail with a constraint violation.
+
+**Uniqueness is checked twice.** The service checks `card_number` up front for a clean
+`409` message; the `unique` column constraint plus a `DataIntegrityViolationException`
+handler is the safety net for two concurrent requests racing past the check.
+
+**Alternatives to know about** (not used here):
+
+- `@MapsId` shares the primary key: `id_card.id` *is* the person id, so there is no
+  separate FK column and no `unique` needed. Best when the child has no identity of its own.
+- A shared unidirectional mapping (only `IDCard.person`, no `Person.idCard`) avoids the
+  eager-load problem entirely, at the cost of `person.getIdCard()` becoming a repository call.
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+- `PersonTest` — the helper methods keep both sides consistent.
+- `PersonIdCardApiTest` — full stack (MockMvc + H2): create with/without card, validation,
+  duplicate handling, list, update, cascade delete, create-or-replace card, orphan removal,
+  lookup by card number, `404` cases.
