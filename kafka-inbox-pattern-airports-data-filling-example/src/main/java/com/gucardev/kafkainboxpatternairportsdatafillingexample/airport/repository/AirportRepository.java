@@ -11,11 +11,6 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface AirportRepository extends JpaRepository<Airport, String> {
 
-    /**
-     * {@code SELECT ... FOR UPDATE}: while one processor applies an event to this airport, a
-     * second processor (another instance) handling another event of the same airport waits here.
-     * The version comparison therefore always sees the latest committed version.
-     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select a from Airport a where a.code = :code")
     Optional<Airport> findByCodeForUpdate(String code);

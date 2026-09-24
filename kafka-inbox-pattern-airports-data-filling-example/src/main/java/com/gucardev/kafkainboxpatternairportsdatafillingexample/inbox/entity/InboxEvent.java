@@ -16,10 +16,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * One received change. Inserted by {@code InboxWriter} (SQL), then moved through its statuses by
- * {@code InboxProcessor}. Rows are never updated by the receiving side.
- */
 @Entity
 @Table(name = "inbox_event")
 @Getter
@@ -45,7 +41,6 @@ public class InboxEvent {
     @Column(nullable = false, updatable = false)
     private long version;
 
-    /** The event exactly as received (validated), stored as jsonb. */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false, updatable = false)
     private String payload;
@@ -76,17 +71,15 @@ public class InboxEvent {
         finish(InboxStatus.PROCESSED, null);
     }
 
-    public void markSkipped(String reason) {
-        finish(InboxStatus.SKIPPED, reason);
+    public void markSkipped() {
+        finish(InboxStatus.SKIPPED, null);
     }
 
-    /** Non-retryable: the payload itself is broken. */
     public void markFailed(String error) {
         attempts++;
         finish(InboxStatus.FAILED, error);
     }
 
-    /** Retryable: try again after the backoff, or give up after max attempts. */
     public void recordFailedAttempt(String error, int maxAttempts, Duration backoff) {
         attempts++;
         lastError = truncate(error);
@@ -97,14 +90,6 @@ public class InboxEvent {
             // linear backoff: 1x, 2x, 3x ... the configured delay
             nextAttemptAt = Instant.now().plus(backoff.multipliedBy(attempts));
         }
-    }
-
-    /** Manual retry of a FAILED event, after the cause was fixed. */
-    public void resetForRetry() {
-        status = InboxStatus.PENDING;
-        attempts = 0;
-        nextAttemptAt = Instant.now();
-        processedAt = null;
     }
 
     private void finish(InboxStatus status, String message) {

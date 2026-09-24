@@ -29,9 +29,8 @@ app:
     airport-events-topic: airport-events
   inbox:
     poll-interval: 500ms
-    # A failing event is retried this many times, then marked FAILED for manual inspection.
+    # A failing event is retried this many times, then marked FAILED. Corrected events need a new transactionId.
     max-attempts: 5
     retry-backoff: 5s
-    # PROCESSED and SKIPPED rows older than this are deleted by the cleanup job; FAILED rows stay.
     retention: 7d
-    cleanup-cron: "0 0 3 * * *"
+    cleanup-cron: "0 0 3 * * *" # UTC; only one instance runs cleanup via ShedLock.

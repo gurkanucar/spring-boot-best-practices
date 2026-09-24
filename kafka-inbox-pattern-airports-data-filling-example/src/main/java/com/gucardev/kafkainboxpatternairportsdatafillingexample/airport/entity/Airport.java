@@ -25,7 +25,6 @@ import org.hibernate.annotations.BatchSize;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Airport {
 
-    /** IATA code, the natural key. Assigned by the source, not generated. */
     @Id
     @Column(length = 3)
     private String code;
@@ -45,10 +44,7 @@ public class Airport {
     @Column(nullable = false, length = 50)
     private String timezone;
 
-    /**
-     * The SOURCE system's version of this airport, taken from the event. Deliberately not a JPA
-     * {@code @Version}: we never increment it ourselves, we only compare incoming versions with it.
-     */
+    // Source version, not a JPA optimistic-lock counter.
     @Column(nullable = false)
     private long version;
 
@@ -74,7 +70,6 @@ public class Airport {
         return airport;
     }
 
-    /** Replaces the whole state with the snapshot. Only called for a newer version. */
     public void applySnapshot(AirportPayload snapshot, long version, String transactionId) {
         this.icaoCode = snapshot.icaoCode();
         this.name = snapshot.name();
@@ -87,15 +82,7 @@ public class Airport {
         syncRunways(snapshot.runways());
     }
 
-    /**
-     * Brings the runways in line with the snapshot by their natural key (the designator):
-     * existing ones are updated in place, missing ones removed, new ones added.
-     *
-     * <p>Not "clear() and add all": Hibernate executes INSERTs before DELETEs when flushing, so
-     * re-adding a runway with the same designator would hit the unique constraint
-     * {@code (airport_code, designator)} before the old row is deleted. Updating in place also
-     * keeps row ids stable and writes only what really changed.
-     */
+    // Update in place to preserve IDs and avoid delete/reinsert unique-key conflicts.
     private void syncRunways(List<RunwayPayload> incoming) {
         Map<String, RunwayPayload> byDesignator = incoming.stream()
                 .collect(Collectors.toMap(RunwayPayload::designator, Function.identity()));

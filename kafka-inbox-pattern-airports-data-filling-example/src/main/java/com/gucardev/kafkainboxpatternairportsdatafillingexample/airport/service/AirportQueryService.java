@@ -6,18 +6,16 @@ import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.entity.A
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.repository.AirportRepository;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.common.error.ResourceNotFoundException;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class AirportQueryService {
 
     private final AirportRepository repository;
-
-    public AirportQueryService(AirportRepository repository) {
-        this.repository = repository;
-    }
 
     public AirportResponse get(String code) {
         // runways are fetched together with the airport (entity graph)

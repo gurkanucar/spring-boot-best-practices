@@ -8,19 +8,16 @@ import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.repository
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * The receiving side of the inbox: stores an event and nothing else. No business logic runs
- * here, so receiving is fast and can only fail for infrastructure reasons.
- */
 @Component
+@RequiredArgsConstructor
 public class InboxWriter {
 
-    /** The result for the sender: where the event is, and whether it had been received before. */
     public record Received(long inboxEventId, InboxStatus status, boolean duplicate) {
     }
 
@@ -28,19 +25,6 @@ public class InboxWriter {
     private final JsonMapper jsonMapper;
     private final InboxEventRepository repository;
 
-    public InboxWriter(JdbcClient jdbc, JsonMapper jsonMapper, InboxEventRepository repository) {
-        this.jdbc = jdbc;
-        this.jsonMapper = jsonMapper;
-        this.repository = repository;
-    }
-
-    /**
-     * {@code ON CONFLICT (transaction_id) DO NOTHING} makes storing idempotent in a single
-     * statement: a redelivered Kafka message or a retried REST call inserts nothing and is
-     * reported as a duplicate. No exception, no check-then-insert race between instances.
-     *
-     * @param kafkaPosition topic-partition@offset for Kafka events, null for REST
-     */
     @Transactional
     public Received store(AirportEvent event, InboxSource source, String kafkaPosition) {
         Timestamp now = Timestamp.from(Instant.now());

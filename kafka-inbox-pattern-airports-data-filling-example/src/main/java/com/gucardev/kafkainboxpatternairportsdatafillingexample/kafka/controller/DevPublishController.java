@@ -12,11 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * DEV ONLY: plays the external system that publishes airport events, so the Kafka path can be
- * tried with curl. The body is sent as-is (even invalid JSON, to try the dead letter topic).
- * Would not exist in a real consumer service.
- */
 @RestController
 @RequestMapping("/dev/kafka")
 public class DevPublishController {
@@ -30,7 +25,6 @@ public class DevPublishController {
         this.topic = topic;
     }
 
-    /** {@code key} becomes the Kafka message key; it should be the airport code. */
     @PostMapping("/airport-events/{key}")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public Map<String, Object> publish(@PathVariable String key, @RequestBody String body) throws Exception {

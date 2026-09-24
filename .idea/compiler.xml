@@ -10,25 +10,6 @@
         <module name="rest-api-design" />
         <module name="caching" />
       </profile>
-      <profile name="Annotation profile for dto-field-masker" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="er-one-to-many" />
-        <module name="swagger-openapi-docs" />
-        <module name="jackson" />
-        <module name="dto-field-masker" />
-        <module name="er-one-to-one" />
-        <module name="quartz-scheduler-shedlock" />
-        <module name="slf4j-logging" />
-        <module name="er-many-to-many" />
-        <module name="validation" />
-        <module name="logbook-logging-requests" />
-      </profile>
       <profile name="Annotation profile for kafka-inbox-pattern-airports-data-filling-example" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -36,10 +17,20 @@
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
-        <module name="entity-encryption" />
+        <module name="er-one-to-many" />
+        <module name="kafka-inbox-pattern-airports-data-filling-example" />
+        <module name="er-one-to-one" />
+        <module name="er-many-to-many" />
+        <module name="swagger-openapi-docs" />
+        <module name="jackson" />
         <module name="entity-auditing" />
         <module name="rest-api-integration" />
-        <module name="kafka-inbox-pattern-airports-data-filling-example" />
+        <module name="dto-field-masker" />
+        <module name="quartz-scheduler-shedlock" />
+        <module name="entity-encryption" />
+        <module name="slf4j-logging" />
+        <module name="validation" />
+        <module name="logbook-logging-requests" />
       </profile>
     </annotationProcessing>
   </component>

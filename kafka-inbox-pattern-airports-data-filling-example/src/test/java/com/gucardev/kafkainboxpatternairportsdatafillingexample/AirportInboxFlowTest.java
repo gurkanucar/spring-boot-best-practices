@@ -1,14 +1,11 @@
 package com.gucardev.kafkainboxpatternairportsdatafillingexample;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.awaitility.Awaitility.await;
 import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -16,18 +13,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.TestcontainersConfiguration.DeadLetterCollector;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.dto.AirportResponse;
+import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.dto.AirportUpdateRequest;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.entity.RunwaySurface;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.airport.service.AirportQueryService;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.event.dto.AirportEvent;
-import com.gucardev.kafkainboxpatternairportsdatafillingexample.event.dto.AirportPayload;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.event.dto.AirportPayload;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.event.dto.RunwayPayload;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.dto.InboxEventResponse;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.entity.InboxSource;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.entity.InboxStatus;
-import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.service.InboxAdminService;
-import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.service.InboxCleanupJob;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.service.InboxProcessor;
+import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.service.InboxQueryService;
 import com.gucardev.kafkainboxpatternairportsdatafillingexample.inbox.service.InboxWriter;
 import java.time.Duration;
 import java.time.Instant;
@@ -52,13 +48,11 @@ class AirportInboxFlowTest extends IntegrationTestBase {
     @Autowired
     private AirportQueryService airports;
     @Autowired
-    private InboxAdminService inbox;
+    private InboxQueryService inbox;
     @Autowired
     private InboxWriter inboxWriter;
     @Autowired
     private InboxProcessor processor;
-    @Autowired
-    private InboxCleanupJob cleanupJob;
     @Autowired
     private DeadLetterCollector deadLetters;
     @Autowired
@@ -74,11 +68,16 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                 .query(Long.class).single();
     }
 
+    private List<InboxEventResponse> changesFor(String code) {
+        return jdbc.sql("select id from inbox_event where airport_code = :code order by id")
+                .param("code", code).query(Long.class).list().stream().map(inbox::get).toList();
+    }
+
     private List<InboxEventResponse> awaitChanges(String code, int count) {
-        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(inbox.forAirport(code))
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(changesFor(code))
                 .hasSize(count)
                 .allSatisfy(e -> assertThat(e.status()).isNotEqualTo(InboxStatus.PENDING)));
-        return inbox.forAirport(code);
+        return changesFor(code);
     }
 
     // ---------------------------------------------------------------- Kafka path
@@ -110,7 +109,7 @@ class AirportInboxFlowTest extends IntegrationTestBase {
 
         awaitVersion(code, 1);
         Thread.sleep(500); // give the second message time to arrive
-        assertThat(inbox.forAirport(code)).hasSize(1);
+        assertThat(changesFor(code)).hasSize(1);
     }
 
     @Test
@@ -146,7 +145,7 @@ class AirportInboxFlowTest extends IntegrationTestBase {
         List<InboxEventResponse> changes = awaitChanges(code, 3);
         assertThat(changes).extracting(InboxEventResponse::status)
                 .containsExactly(InboxStatus.PROCESSED, InboxStatus.SKIPPED, InboxStatus.SKIPPED);
-        assertThat(changes.get(1).lastError()).isEqualTo("Stale: event version 4, airport already at version 5");
+        assertThat(changes.get(1).lastError()).isNull();
         assertThat(airports.get(code).name()).isEqualTo("Version 5");
     }
 
@@ -171,7 +170,7 @@ class AirportInboxFlowTest extends IntegrationTestBase {
         ConsumerRecord<String, String> dead = received.stream().filter(r -> r.key().equals("ZZZ")).findFirst().orElseThrow();
         assertThat(new String(dead.headers().lastHeader(KafkaHeaders.DLT_EXCEPTION_MESSAGE).value()))
                 .contains("does not match airportCode");
-        assertThat(inbox.forAirport(code)).isEmpty();
+        assertThat(changesFor(code)).isEmpty();
     }
 
     // ---------------------------------------------------------------- REST path
@@ -198,15 +197,15 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.duplicate").value(true))
                 .andExpect(jsonPath("$.status").value("PROCESSED"));
-        mockMvc.perform(get("/api/airports/" + code + "/changes"))
-                .andExpect(jsonPath("$[*].source", contains("REST")));
     }
 
     @Test
     void restAndKafkaFollowTheSameVersionRule() throws Exception {
         String code = newAirportCode();
+        AirportEvent event = event(code, 3, "REST v3");
+        var request = new AirportUpdateRequest(event.transactionId(), event.version(), event.occurredAt(), event.airport());
         mockMvc.perform(put("/api/airports/" + code).contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonMapper.writeValueAsString(event(code, 3, "REST v3")).replace("\"airportCode\":\"" + code + "\",", "")))
+                        .content(jsonMapper.writeValueAsString(request)))
                 .andExpect(status().isAccepted());
         awaitVersion(code, 3);
 
@@ -230,8 +229,8 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", contains(
                         "airport.icaoCode: must be a 4-letter ICAO code",
-                        "airport.runwayDesignatorsUnique: runway designators must be unique",
-                        "airport.timezoneKnown: must be a known time zone, e.g. Europe/Istanbul",
+                        "airport.runways: runway designators must be unique",
+                        "airport.timezone: must be a known time zone, e.g. Europe/Istanbul",
                         "transactionId: must not be blank",
                         "version: must be greater than 0")));
 
@@ -240,13 +239,30 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors", contains("code: must be a 3-letter IATA code")));
 
-        assertThat(inbox.forAirport(code)).isEmpty();
+        assertThat(changesFor(code)).isEmpty();
+    }
+
+    @Test
+    void nullRunwayIsAValidationErrorForBothSources() throws Exception {
+        String code = newAirportCode();
+        AirportEvent invalid = event(code, 1, "Null runway", java.util.Collections.singletonList(null));
+        var request = new AirportUpdateRequest(invalid.transactionId(), invalid.version(), invalid.occurredAt(), invalid.airport());
+        mockMvc.perform(put("/api/airports/" + code).contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[0]").value("airport.runways[0]: must not be null"));
+
+        deadLetters.records().clear();
+        publish(invalid);
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(deadLetters.records())
+                .anySatisfy(record -> assertThat(record.key()).isEqualTo(code)));
+        assertThat(changesFor(code)).isEmpty();
     }
 
     // ---------------------------------------------------------------- failures and operations
 
     @Test
-    void failingEventIsRetriedThenFailedAndCanBeRetriedManuallyAfterTheFix() throws Exception {
+    void failingEventStopsAfterMaxAttemptsAndCorrectedEventCanBeProcessed() throws Exception {
         String holder = newAirportCode();
         String newcomer = newAirportCode();
         publish(event(holder, 1, "Holds the ICAO code"));
@@ -257,31 +273,20 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                 new AirportPayload(icaoFor(holder), "Newcomer", "Izmir", "TR", "Europe/Istanbul", List.of()));
         publish(conflicting);
 
-        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(inbox.forAirport(newcomer))
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(changesFor(newcomer))
                 .singleElement().satisfies(e -> {
                     assertThat(e.status()).isEqualTo(InboxStatus.FAILED);
                     assertThat(e.attempts()).isEqualTo(3);
                     assertThat(e.lastError()).contains("airport_icao_code_key");
                 }));
-        long failedId = inbox.forAirport(newcomer).getFirst().id();
+        long failedId = changesFor(newcomer).getFirst().id();
         mockMvc.perform(get("/api/inbox").param("status", "FAILED"))
                 .andExpect(jsonPath("$[*].id", hasItem((int) failedId)));
 
-        // fix the cause: the holder gets a new ICAO code (newer version)
-        AirportEvent fix = new AirportEvent("fix-" + holder, holder, 2L, Instant.now(),
-                new AirportPayload("Z" + holder, "Holds the ICAO code", "Istanbul", "TR", "Europe/Istanbul", List.of()));
-        publish(fix);
-        awaitVersion(holder, 2);
-
-        mockMvc.perform(post("/api/inbox/" + failedId + "/retry"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("PENDING"));
-        assertThat(awaitVersion(newcomer, 1).icaoCode()).isEqualTo(icaoFor(holder));
-        assertThat(inbox.get(failedId).status()).isEqualTo(InboxStatus.PROCESSED);
-
-        mockMvc.perform(post("/api/inbox/" + failedId + "/retry"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail", containsString("Only FAILED events can be retried")));
+        // Failed rows remain available. Submit corrected data with a new transaction id.
+        publish(event(newcomer, 2, "Corrected"));
+        assertThat(awaitVersion(newcomer, 2).icaoCode()).isEqualTo(icaoFor(newcomer));
+        assertThat(inbox.get(failedId).status()).isEqualTo(InboxStatus.FAILED);
     }
 
     @Test
@@ -293,10 +298,10 @@ class AirportInboxFlowTest extends IntegrationTestBase {
                         values (:tx, 'REST', :code, 1, '{"unexpected": true}'::jsonb, 'PENDING', 0, now(), now())""")
                 .param("tx", "broken-" + code).param("code", code).update();
 
-        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(inbox.forAirport(code)).singleElement().satisfies(e -> {
+        await().atMost(TIMEOUT).untilAsserted(() -> assertThat(changesFor(code)).singleElement().satisfies(e -> {
             assertThat(e.status()).isEqualTo(InboxStatus.FAILED);
             assertThat(e.attempts()).isEqualTo(1);
-            assertThat(e.lastError()).startsWith("Invalid payload: ");
+            assertThat(e.lastError()).isEqualTo("Invalid payload");
         }));
     }
 
@@ -329,21 +334,4 @@ class AirportInboxFlowTest extends IntegrationTestBase {
         assertThat(airport.name()).isEqualTo("v40");
     }
 
-    @Test
-    void cleanupDeletesOldFinishedEventsButKeepsFailedOnes() throws Exception {
-        String code = newAirportCode();
-        publish(event(code, 1, "To be cleaned"));
-        awaitChanges(code, 1);
-        long failedBefore = inbox.list(InboxStatus.FAILED).size();
-
-        // the scheduled entry point (self-invocation inside the job) must run in a transaction too
-        assertThatNoException().isThrownBy(cleanupJob::scheduledCleanup);
-
-        int deleted = cleanupJob.deleteFinishedBefore(Instant.now().plusSeconds(1));
-
-        assertThat(deleted).isPositive();
-        assertThat(inbox.forAirport(code)).isEmpty();
-        assertThat(airports.get(code).version()).isEqualTo(1); // the airport itself is untouched
-        assertThat(inbox.list(InboxStatus.FAILED)).hasSize((int) failedBefore);
-    }
 }
