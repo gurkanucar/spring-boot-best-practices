@@ -1,0 +1,338 @@
+# Spring Boot Many-to-Many Relationship Examples
+
+Two ways to model a many-to-many relationship with JPA, side by side, each with a full CRUD
+API, DTOs, validation and consistent error responses. It is a sibling of the `er-one-to-one`
+and `er-one-to-many` modules and follows the same structure.
+
+| Example | Entities | Join table | Use when |
+|---|---|---|---|
+| **simple** | `Product` ↔ `Category` via `@ManyToMany` | `product_category`, managed by Hibernate, no entity | the link carries **no data of its own** |
+| **complex** | `Student` ↔ `Course` via an `Enrollment` **entity** | `enrollment`, with its own columns (`grade`, `enrolledAt`) | the link **has attributes**, or needs its own lifecycle and API |
+
+Spring Boot 4.1.1 · Java 25 · Spring Data JPA · H2 (in-memory)
+
+## Running
+
+```bash
+cd er-many-to-many
+./mvnw spring-boot:run
+```
+
+- Simple API: http://localhost:8090/api/simple/products
+- Complex API: http://localhost:8090/api/complex/students
+- H2 console: http://localhost:8090/h2-console (JDBC URL `jdbc:h2:mem:manytomany`)
+
+The database is recreated on every start (`ddl-auto: create-drop`), and the executed SQL is
+logged so you can watch what each request does.
+
+## Package layout
+
+The two examples live in separate top-level packages; inside each, every feature is laid out
+the same way as in the other modules.
+
+```
+com.gucardev.ermanytomany
+├── simple/
+│   ├── product/         Product entity (owning side), repository, service, controller, mapper
+│   │   └── dto/         ProductRequest, ProductResponse
+│   └── category/        Category entity (inverse side), repository, service, controller, mapper
+│       └── dto/         CategoryRequest, CategoryResponse
+├── complex/
+│   ├── student/         Student entity, repository, service, controller, mapper
+│   │   └── dto/         StudentRequest, StudentResponse
+│   ├── course/          Course entity, repository, service, controller, mapper
+│   │   └── dto/         CourseRequest, CourseResponse
+│   └── enrollment/      Enrollment + EnrollmentId, repository, service, controller
+│       └── dto/         EnrollRequest, GradeRequest, EnrollmentResponse
+└── common/error/        ResourceNotFoundException, ConflictException, GlobalExceptionHandler
+```
+
+The two examples do not depend on each other; they only share `common/error`.
+
+---
+
+# Simple: Product ↔ Category (`@ManyToMany`)
+
+```
+product                 product_category              category
++----+-------+-------+  +------------+-------------+  +----+------+
+| id | name  | price |  | product_id | category_id |  | id | name |
++----+-------+-------+  +------------+-------------+  +----+------+
+                          PK (category_id, product_id)
+```
+
+| | `Product` (owning side) | `Category` (inverse side) |
+|---|---|---|
+| Mapping | `@ManyToMany` + `@JoinTable(name = "product_category", ...)` | `@ManyToMany(mappedBy = "categories")` |
+| Owns the join table | yes: only changes made here are written | no: a read mirror |
+| Cascade | **none** | none |
+
+Key points:
+
+- **The owning side writes the join table.** Adding a product to `category.products` alone
+  persists nothing. Hence the helper methods below.
+- **Never cascade `REMOVE`/`ALL` on a many-to-many.** Categories are shared: deleting one
+  product would delete a category still used by other products. There is no cascade at all
+  here; categories are looked up by id and linked.
+- **Use a `Set`, not a `List`.** With a `Set`, Hibernate issues targeted
+  `insert`/`delete ... where product_id = ? and category_id = ?` statements for exactly the
+  changed links. With a `List` (a "bag") it deletes *all* of the product's join rows and
+  re-inserts them on every change.
+- **The composite primary key** `(category_id, product_id)` is created automatically for a
+  `Set`, so a product cannot be linked to the same category twice.
+
+## Helper methods
+
+```java
+// Product (owning side)
+public void addCategory(Category category) {
+    categories.add(category);
+    category.linkProduct(this);      // keeps the in-memory inverse side in sync
+}
+
+public void removeCategory(Category category) {
+    categories.remove(category);
+    category.unlinkProduct(this);
+}
+```
+
+Both collections are exposed read-only (`Collections.unmodifiableSet`), so the helpers are
+the only way to change the association. `linkProduct`/`unlinkProduct` are the inverse-side
+hooks the helpers call. Unit-tested in `ProductTest`.
+
+## Endpoints
+
+Categories: `/api/simple/categories`
+
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/simple/categories` | Create (name is unique) | `201` | `400`, `409` |
+| `GET` | `/api/simple/categories` | Page of categories | `200` | |
+| `GET` | `/api/simple/categories/{id}` | Get one | `200` | `404` |
+| `PUT` | `/api/simple/categories/{id}` | Rename | `200` | `400`, `404`, `409` |
+| `DELETE` | `/api/simple/categories/{id}` | Delete; products are detached, not deleted | `204` | `404` |
+
+Products: `/api/simple/products`
+
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/simple/products` | Create, optionally with `categoryIds` | `201` | `400`, `404` unknown category |
+| `GET` | `/api/simple/products` | Page of products; optional `?categoryId=` filter | `200` | |
+| `GET` | `/api/simple/products/{id}` | Get one with its categories | `200` | `404` |
+| `PUT` | `/api/simple/products/{id}` | Replace name, price **and the whole category set** | `200` | `400`, `404` |
+| `DELETE` | `/api/simple/products/{id}` | Delete; join rows go, categories stay | `204` | `404` |
+| `PUT` | `/api/simple/products/{id}/categories/{categoryId}` | Add one category (idempotent) | `200` | `404` |
+| `DELETE` | `/api/simple/products/{id}/categories/{categoryId}` | Remove one category | `204` | `404` not linked |
+
+### Try it
+
+```bash
+curl -X POST localhost:8090/api/simple/categories -H 'Content-Type: application/json' -d '{"name":"Books"}'
+curl -X POST localhost:8090/api/simple/categories -H 'Content-Type: application/json' -d '{"name":"Sale"}'
+
+# product linked to both categories
+curl -i -X POST localhost:8090/api/simple/products -H 'Content-Type: application/json' \
+  -d '{"name":"Novel","price":9.99,"categoryIds":[1,2]}'
+
+# list, filter by category, add and remove a single link
+curl 'localhost:8090/api/simple/products?sort=name'
+curl 'localhost:8090/api/simple/products?categoryId=1'
+curl -X DELETE localhost:8090/api/simple/products/1/categories/2
+curl -X PUT    localhost:8090/api/simple/products/1/categories/2
+```
+
+Example response:
+
+```json
+{
+  "id": 1, "name": "Novel", "price": 9.99,
+  "categories": [ { "id": 1, "name": "Books" }, { "id": 2, "name": "Sale" } ]
+}
+```
+
+## Simple: design notes
+
+**Deleting the inverse side needs manual cleanup.** Deleting a `Product` removes its
+`product_category` rows automatically (it owns them). Deleting a `Category` does not: the join
+rows would still reference it and violate the foreign key. `CategoryService.delete` therefore
+calls `product.removeCategory(category)` for each product first, then deletes the category.
+
+**`PUT` on a product replaces the category set.** `ProductService.update` diffs the requested
+set against the current one and only removes/adds the difference, so unchanged links produce no
+SQL. Omitting `categoryIds` on PUT means "no categories".
+
+**Filtering by category goes through the database.** `ProductRepository.findByCategoriesId`
+joins the join table in SQL and paginates there. Going through `category.getProducts()` would
+load every product of the category into memory.
+
+**Loading strategy.** `findById` uses `@EntityGraph("categories")`; the paged list uses
+`@BatchSize(size = 50)` on `Product.categories`, because a fetch join on a collection cannot be
+paginated in SQL. `QueryCountTest` shows the result: a page of 20 products with their
+categories costs 3 statements (page, count, one batched categories query) instead of 22. See
+the `er-one-to-many` README ("Where does `join fetch` go?") for the full decision guide.
+
+**Identity `equals`/`hashCode`.** The entities keep the default identity equality. That is
+correct for managed instances inside one transaction, which is all this app does. An id-based
+`equals` breaks before persist (the id is `null`, so every new entity equals every other).
+
+**The bidirectional catch.** `addCategory` also updates `category.products`, which forces
+Hibernate to load that whole set. On a category with 100,000 products this is expensive. If the
+`Category → products` direction is not needed, drop `Category.products` and make the mapping
+unidirectional: no inverse hooks, no such loading, and "products of a category" stays a
+repository query (as it already is here).
+
+---
+
+# Complex: Student ↔ Course through Enrollment
+
+```
+student                 enrollment                                    course
++----+------+           +------------+-----------+-------+-----------+ +----+-------+
+| id | name |  <------  | student_id | course_id | grade | enrolled_at | | id | title |
++----+------+    FK     +------------+-----------+-------+-------------+ +----+-------+
+                          PK (course_id, student_id)        FK  ------>
+```
+
+A plain `@ManyToMany` cannot hold `grade` or `enrolledAt`: there is nowhere to put a column
+that belongs to the *link*. The fix is to promote the join table to an entity and replace the
+`@ManyToMany` with two `@OneToMany` / `@ManyToOne` pairs:
+
+```
+Student 1 ──< Enrollment >── 1 Course
+```
+
+| | `Enrollment` (owning side of both) | `Student` / `Course` (inverse sides) |
+|---|---|---|
+| Mapping | two `@ManyToOne(fetch = LAZY, optional = false)` marked `@Id` | `@OneToMany(mappedBy = ..., cascade = ALL, orphanRemoval = true)` |
+| Primary key | composite `(student_id, course_id)` via `@IdClass(EnrollmentId.class)` | generated `id` |
+| Extra columns | `grade`, `enrolledAt` | none |
+
+Key points:
+
+- **The composite key is the rule "at most one enrollment per pair".** The database rejects a
+  duplicate; the service also checks first for a clean `409`.
+- **`@IdClass` with `@Id @ManyToOne`** (a "derived identity") means the entity has no separate
+  surrogate id: the two foreign keys *are* the key. `EnrollmentId` mirrors the `@Id` field names
+  (`student`, `course`) but holds their primary key types (`Long`).
+- **Cascade is fine here**, unlike the simple example: an enrollment belongs to exactly one
+  student and one course and has no life outside them. Deleting a student or a course deletes
+  its enrollments; the other side stays.
+- **`orphanRemoval`** deletes the row when an enrollment is removed from the collection
+  (`unenroll`).
+
+## Helper methods
+
+```java
+// Student
+public Enrollment enroll(Course course, String grade, LocalDate enrolledAt) {
+    Enrollment enrollment = new Enrollment();
+    enrollment.setStudent(this);
+    enrollment.setCourse(course);
+    enrollment.setGrade(grade);
+    enrollment.setEnrolledAt(enrolledAt);
+
+    enrollments.add(enrollment);          // student side
+    course.linkEnrollment(enrollment);    // course side
+    return enrollment;
+}
+
+public void unenroll(Enrollment enrollment) {
+    enrollments.remove(enrollment);
+    enrollment.getCourse().unlinkEnrollment(enrollment);
+}
+```
+
+Both collections are read-only from outside. Unit-tested in `StudentTest`.
+
+## Enrollment is a resource of its own
+
+`StudentResponse` and `CourseResponse` deliberately do **not** embed enrollments. A student can
+have many and a course can have thousands, so the link is exposed as a paged sub-resource, read
+with a DTO projection (no entities loaded at all) and reachable from both sides.
+
+| Method | Path | Description | Success | Errors |
+|---|---|---|---|---|
+| `POST` | `/api/complex/students` | Create a student | `201` | `400` |
+| `GET` / `PUT` / `DELETE` | `/api/complex/students[/{id}]` | Page / get / update / delete (cascades to enrollments) | `200`/`204` | `400`, `404` |
+| `POST` | `/api/complex/courses` | Create a course | `201` | `400` |
+| `GET` / `PUT` / `DELETE` | `/api/complex/courses[/{id}]` | Page / get / update / delete (cascades to enrollments) | `200`/`204` | `400`, `404` |
+| `POST` | `/api/complex/students/{studentId}/enrollments` | Enroll: `{"courseId": 1, "grade": "AA"}` (grade optional) | `201` + `Location` | `400`, `404`, `409` already enrolled |
+| `GET` | `/api/complex/students/{studentId}/enrollments` | The student's courses (paged) | `200` | `404` |
+| `GET` | `/api/complex/students/{studentId}/enrollments/{courseId}` | One enrollment | `200` | `404` |
+| `PUT` | `/api/complex/students/{studentId}/enrollments/{courseId}` | Set the grade: `{"grade": "BA"}` | `200` | `400`, `404` |
+| `DELETE` | `/api/complex/students/{studentId}/enrollments/{courseId}` | Unenroll; student and course stay | `204` | `404` |
+| `GET` | `/api/complex/courses/{courseId}/enrollments` | The course roster (paged) | `200` | `404` |
+
+### Try it
+
+```bash
+curl -X POST localhost:8090/api/complex/students -H 'Content-Type: application/json' -d '{"name":"Ada"}'
+curl -X POST localhost:8090/api/complex/courses  -H 'Content-Type: application/json' -d '{"title":"Math"}'
+
+curl -i -X POST localhost:8090/api/complex/students/1/enrollments \
+  -H 'Content-Type: application/json' -d '{"courseId":1}'
+curl -X PUT localhost:8090/api/complex/students/1/enrollments/1 \
+  -H 'Content-Type: application/json' -d '{"grade":"AA"}'
+
+curl localhost:8090/api/complex/students/1/enrollments     # a student's courses
+curl localhost:8090/api/complex/courses/1/enrollments      # a course's roster
+curl -X DELETE localhost:8090/api/complex/students/1/enrollments/1
+```
+
+Example response:
+
+```json
+{
+  "studentId": 1, "studentName": "Ada",
+  "courseId": 1, "courseTitle": "Math",
+  "grade": "AA", "enrolledAt": "2026-09-24"
+}
+```
+
+## Complex: design notes
+
+**Reads are DTO projections.** `EnrollmentRepository` selects
+`new EnrollmentResponse(s.id, s.name, c.id, c.title, e.grade, e.enrolledAt)` from
+`Enrollment e join e.student s join e.course c`. Student, Course and Enrollment entities are
+never created, so there is no lazy loading and no N+1; `QueryCountTest` asserts zero entities
+loaded. The `count` queries are written explicitly because Spring Data cannot derive one from a
+constructor-expression query. Sorting via `?sort=` applies to `Enrollment` fields (for example
+`grade`, `enrolledAt`).
+
+**Writes go through the entities.** `enroll` and `unenroll` use the helper methods so both
+in-memory collections stay consistent and cascade/orphan removal do the persistence. The price
+is that both collections get loaded to be modified. For very large collections (a course with
+100,000 students), skip the helpers on that path: create the `Enrollment` directly and save it
+through `EnrollmentRepository`, and delete with a repository query. That touches one row instead
+of loading the roster.
+
+**Why not `@EmbeddedId` + `@MapsId`?** It is the other common way to map this table and is
+equally valid: an `@Embeddable` id class holds `studentId`/`courseId`, and `@MapsId` links the
+`@ManyToOne` fields to it. Prefer it if you want the key as a single object (for
+`findById(new EnrollmentId(...))`). `@IdClass` is used here because it keeps the entity fields
+simple; the repository still has the `EnrollmentId` type for `JpaRepository`.
+
+**Simple vs complex: how to choose.** Start with `@ManyToMany` if the link is a pure pairing.
+Move to an association entity the moment the link needs a column, an audit trail, a status, or
+its own endpoints. Migrating later means changing the mapping *and* the table, so if you can
+already see a future `createdAt` or `role` on the link, model it as an entity from the start.
+
+---
+
+## Tests
+
+```bash
+./mvnw test
+```
+
+- `ProductTest`, `StudentTest`: the helper methods keep both sides consistent and the
+  collections are read-only from outside.
+- `SimpleManyToManyApiTest`: full stack (MockMvc + H2): category CRUD and unique names, create
+  with/without categories, validation, unknown category `404`, PUT replacing the category set,
+  add/remove a single link, filter and paginate by category, join-row cleanup when deleting a
+  product or a category.
+- `ComplexManyToManyApiTest`: student/course CRUD, enroll with location header, duplicate `409`,
+  unknown ids `404`, many-to-many both directions, grading, unenroll keeps both sides, cascade
+  delete from either side.
+- `QueryCountTest`: asserts the exact SQL statement count (and entities loaded) for the
+  batch-fetched product list and the enrollment projection.

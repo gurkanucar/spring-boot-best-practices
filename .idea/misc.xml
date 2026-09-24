@@ -14,6 +14,7 @@
         <option value="$PROJECT_DIR$/quartz-scheduler-shedlock/pom.xml" />
         <option value="$PROJECT_DIR$/er-one-to-one/pom.xml" />
         <option value="$PROJECT_DIR$/er-one-to-many/pom.xml" />
+        <option value="$PROJECT_DIR$/er-many-to-many/pom.xml" />
       </list>
     </option>
   </component>

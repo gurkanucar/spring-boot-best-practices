@@ -24,7 +24,7 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for er-one-to-many" enabled="true">
+      <profile name="Annotation profile for er-many-to-many" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -34,12 +34,14 @@
         <module name="er-one-to-many" />
         <module name="er-one-to-one" />
         <module name="quartz-scheduler-shedlock" />
+        <module name="er-many-to-many" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="caching" options="-parameters" />
+      <module name="er-many-to-many" options="-parameters" />
       <module name="er-one-to-many" options="-parameters" />
       <module name="er-one-to-one" options="-parameters" />
       <module name="jackson" options="-parameters" />

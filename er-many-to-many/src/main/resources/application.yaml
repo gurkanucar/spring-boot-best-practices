@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: er-many-to-many
+  datasource:
+    url: jdbc:h2:mem:manytomany;DB_CLOSE_DELAY=-1
+  h2:
+    console:
+      enabled: true
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  port: 8090
