@@ -28,7 +28,7 @@ app:
   kafka:
     airport-events-topic: airport-events
   inbox:
-    poll-interval: 500ms
+    poll-interval: 2s
     # A failing event is retried this many times, then marked FAILED. Corrected events need a new transactionId.
     max-attempts: 5
     retry-backoff: 5s

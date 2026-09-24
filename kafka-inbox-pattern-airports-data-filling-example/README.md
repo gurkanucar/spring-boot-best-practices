@@ -166,7 +166,7 @@ The demo publisher and inbox inspection endpoints are for local demonstration.
 ```yaml
 app:
   inbox:
-    poll-interval: 500ms
+    poll-interval: 2s
     max-attempts: 5
     retry-backoff: 5s
     retention: 7d

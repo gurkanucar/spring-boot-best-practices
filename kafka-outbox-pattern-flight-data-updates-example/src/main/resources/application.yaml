@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: kafka-outbox-pattern-flight-data-updates-example
+  datasource:
+    url: jdbc:postgresql://localhost:5434/flights
+    username: flights
+    password: flights
+  jpa:
+    open-in-view: false
+    hibernate:
+      # The schema belongs to Flyway (db/migration); Hibernate only checks that the mappings match it.
+      ddl-auto: validate
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      # Wait for all in-sync replicas. With idempotence, producer retries neither duplicate nor reorder
+      # records within a partition.
+      acks: all
+      properties:
+        enable.idempotence: true
+        # Fail fast when the broker is unreachable. The event stays in the outbox and is retried later.
+        max.block.ms: 5000
+        request.timeout.ms: 5000
+        delivery.timeout.ms: 10000
+
+server:
+  port: 8097
+
+app:
+  kafka:
+    flight-updates-topic: flight-updates
+  outbox:
+    poll-interval: 2s
+    batch-size: 100
+    # How long the relay waits for the broker's acknowledgement of one event.
+    send-timeout: 15s
+    # Failed sends back off exponentially: 1s, 2s, 4s ... capped at max-backoff. Events are never dropped.
+    retry-backoff: 1s
+    max-backoff: 1m
+    retention: 7d
+    cleanup-cron: "0 0 3 * * *" # UTC; only one instance runs cleanup via ShedLock.

@@ -20,6 +20,7 @@
         <option value="$PROJECT_DIR$/rest-api-integration/pom.xml" />
         <option value="$PROJECT_DIR$/entity-auditing/pom.xml" />
         <option value="$PROJECT_DIR$/kafka-inbox-pattern-airports-data-filling-example/pom.xml" />
+        <option value="$PROJECT_DIR$/kafka-outbox-pattern-flight-data-updates-example/pom.xml" />
       </list>
     </option>
   </component>
