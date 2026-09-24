@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
     // The inverse side of a one-to-one cannot be lazy, so without a fetch join every listed
-    // person triggers its own "select ... from id_card where person_id = ?" (N+1).
+    // person triggers its own "select ... from idcard where person_id = ?" (N+1).
     @Override
     @EntityGraph(attributePaths = "idCard")
     Page<Person> findAll(Pageable pageable);

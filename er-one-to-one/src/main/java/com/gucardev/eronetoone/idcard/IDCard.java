@@ -13,7 +13,7 @@ import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
 
-/** Owning side of the relationship: the {@code id_card.person_id} column is the foreign key. */
+/** Owning side of the relationship: the {@code idcard.person_id} column is the foreign key. */
 @Getter
 @Setter
 @Entity
