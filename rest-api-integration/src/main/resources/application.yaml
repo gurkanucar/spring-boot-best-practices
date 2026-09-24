@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: rest-api-integration
+  ssl:
+    bundle:
+      jks:
+        # Server side of the HTTPS demo: the self-signed certificate of the "partner" server.
+        demo-server:
+          keystore:
+            location: classpath:ssl/demo-server.p12
+            password: changeit
+            type: PKCS12
+      pem:
+        # Client side: trust exactly that one certificate (the right way to call a self-signed server).
+        demo-server-trust:
+          truststore:
+            certificate: classpath:ssl/demo-server.crt
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        # Run the call on the caller's thread and let the HTTP client's own timeouts apply.
+        # By default Spring Cloud submits every call to a thread pool with a 1 second time limiter.
+        disable-thread-pool: true
+        disable-time-limiter: true
+
+server:
+  port: 8093
+
+# Client side: how THIS application calls the remote API.
+remote-api:
+  base-url: http://localhost:${server.port}/remote-api
+  username: partner
+  password: s3cret
+  api-key: demo-api-key
+  connect-timeout: 2s
+  read-timeout: 3s
+
+# Server side: the simulated third-party API that runs inside the same application for the demo.
+mock-remote:
+  username: partner
+  password: s3cret
+  api-key: demo-api-key
+  https-port: 8443

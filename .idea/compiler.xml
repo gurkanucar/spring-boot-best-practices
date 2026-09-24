@@ -29,13 +29,14 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for entity-encryption" enabled="true">
+      <profile name="Annotation profile for rest-api-integration" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
+        <module name="rest-api-integration" />
         <module name="entity-encryption" />
       </profile>
     </annotationProcessing>
@@ -52,6 +53,7 @@
       <module name="logbook-logging-requests" options="-parameters" />
       <module name="quartz-scheduler-shedlock" options="-parameters" />
       <module name="rest-api-design" options="-parameters" />
+      <module name="rest-api-integration" options="-parameters" />
       <module name="slf4j-logging" options="-parameters" />
       <module name="swagger-openapi-docs" options="-parameters" />
       <module name="validation" options="-parameters" />
