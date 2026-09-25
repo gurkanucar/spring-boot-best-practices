@@ -1,0 +1,8 @@
+# Only needed for the shared rate limit store: app.rate-limit.store=redis
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: resilience4j-redis
+    ports:
+      # 6381 on the host, so it does not clash with other Redis instances (the caching example uses 6379).
+      - "6381:6379"

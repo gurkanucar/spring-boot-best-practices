@@ -1,0 +1,144 @@
+spring:
+  application:
+    name: resillience4j
+  threads:
+    virtual:
+      enabled: true
+  http:
+    clients:
+      # Always set timeouts on outgoing calls. Without a read timeout a hanging remote
+      # holds our thread forever, and no retry or circuit breaker will ever see a failure.
+      connect-timeout: 1s
+      read-timeout: 5s
+  data:
+    redis:
+      host: localhost
+      port: 6381
+
+server:
+  port: 8098
+
+# The fake third-party APIs are served by this same application under /fake-api,
+# so the example runs without anything else. The clients still call them over real HTTP.
+fake-api:
+  base-url: http://localhost:${local.server.port}/fake-api
+
+# ---------------------------------------------------------------------------------------
+# Resilience4j: one named instance per remote dependency. The annotations refer to them
+# by name, e.g. @Retry(name = "exchangeRates").
+# ---------------------------------------------------------------------------------------
+resilience4j:
+  retry:
+    instances:
+      exchangeRates:
+        max-attempts: 4                       # 1 call + 3 retries
+        wait-duration: 200ms
+        enable-exponential-backoff: true      # 200ms, 400ms, 800ms ...
+        exponential-backoff-multiplier: 2
+        enable-randomized-wait: true          # ... +-50% jitter, so clients do not retry in lockstep
+        randomized-wait-factor: 0.5
+        retry-exceptions:                     # only transient failures are retried
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:                    # a 4xx will fail the same way every time
+          - org.springframework.web.client.HttpClientErrorException
+      payments:
+        max-attempts: 3
+        wait-duration: 300ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - org.springframework.web.client.HttpClientErrorException
+          # The circuit is open: retrying immediately is pointless, it is still open.
+          - io.github.resilience4j.circuitbreaker.CallNotPermittedException
+
+  circuitbreaker:
+    configs:
+      default:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10               # look at the last 10 calls ...
+        minimum-number-of-calls: 5            # ... but decide only after 5 of them
+        failure-rate-threshold: 50            # open when >= 50% failed
+        slow-call-duration-threshold: 2s      # a call slower than this ...
+        slow-call-rate-threshold: 80          # ... counts too: open when >= 80% are slow
+        wait-duration-in-open-state: 15s      # fail fast for 15s, then let trial calls through
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        register-health-indicator: true
+        record-exceptions:
+          - org.springframework.web.client.HttpServerErrorException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:                    # our bad request does not mean the remote is unhealthy
+          - org.springframework.web.client.HttpClientErrorException
+    instances:
+      recommendations:
+        base-config: default
+      payments:
+        base-config: default
+        wait-duration-in-open-state: 30s
+
+  timelimiter:
+    instances:
+      shipping:
+        timeout-duration: 1s
+        cancel-running-future: true
+
+  bulkhead:
+    instances:
+      invoices:
+        max-concurrent-calls: 2               # the PDF service is slow and small: 2 calls at a time
+        max-wait-duration: 0                  # reject immediately instead of queueing
+
+  ratelimiter:
+    instances:
+      # Outbound: the SMS provider accepts 10 requests/second and answers 429 above that.
+      # We stay well below it (1 call every 200ms = 5/s) and make callers wait for a slot.
+      smsProvider:
+        limit-for-period: 1
+        limit-refresh-period: 200ms
+        timeout-duration: 5s                  # wait up to 5s for a permit, then RequestNotPermitted
+
+# ---------------------------------------------------------------------------------------
+# Inbound rate limiting of OUR api (/api/**), per client, not per IP. See README.
+# ---------------------------------------------------------------------------------------
+app:
+  rate-limit:
+    enabled: true
+    store: in-memory                          # in-memory | redis (redis = shared by all instances)
+    # X-Forwarded-For is only believed when the direct peer is one of these (our load balancer).
+    trusted-proxies:
+      - 127.0.0.1/32
+      - ::1/128
+    # Demo keys. In a real system keys live in a database, hashed, and are issued per client.
+    api-keys:
+      demo-free-key: { client-id: acme-mobile, plan: free }
+      demo-pro-key: { client-id: globex-backend, plan: pro }
+    plans:
+      free: { limit: 20, period: 1m }
+      pro: { limit: 200, period: 1m }
+    anonymous:
+      per-client: { limit: 5, period: 1m }    # one browser (anon_id cookie)
+      per-ip: { limit: 30, period: 1m }       # all anonymous traffic from one IP together
+    # Networks where many real people share one public IP (campus, office, carrier NAT).
+    shared-networks:
+      - name: campus
+        cidr: 10.20.0.0/16
+        per-ip: { limit: 300, period: 1m }
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, circuitbreakers, circuitbreakerevents, retries, retryevents, ratelimiters, bulkheads, timelimiters
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+    # Redis is only needed with app.rate-limit.store=redis; do not report DOWN without it.
+    redis:
+      enabled: false
