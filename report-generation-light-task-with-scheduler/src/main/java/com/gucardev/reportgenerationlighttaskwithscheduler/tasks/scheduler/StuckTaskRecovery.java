@@ -10,7 +10,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * An instance that crashes (or is killed during shutdown) leaves its tasks RUNNING forever.
- * This job hands them back to PENDING. Attempts stay unchanged: the stall was not the task's fault.
+ * This job retries them, or marks them DEAD when the execution budget is exhausted.
+ * The conditional SQL update is safe when recovery runs on several instances.
  */
 @Component
 @RequiredArgsConstructor
@@ -21,12 +22,12 @@ public class StuckTaskRecovery {
     private final TaskProperties properties;
 
     @Scheduled(fixedDelayString = "1m", initialDelayString = "1m")
-    @SchedulerLock(name = "stuckTaskRecovery", lockAtMostFor = "50s", lockAtLeastFor = "10s")
+    @SchedulerLock(name = "stuckTaskRecovery", lockAtMostFor = "50s")
     public void recover() {
         recoverStuckTasks();
     }
 
-    /** One recovery pass without the scheduler lock. Returns the number of tasks handed back. */
+    /** One recovery pass. Returns the number of tasks retried or marked DEAD. */
     public int recoverStuckTasks() {
         int recovered = repository.recoverStuck(properties.stuckAfter().toSeconds());
         if (recovered > 0) {

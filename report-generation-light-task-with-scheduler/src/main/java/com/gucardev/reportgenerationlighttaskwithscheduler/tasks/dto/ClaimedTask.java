@@ -1,6 +1,5 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.dto;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
 import java.util.UUID;
 
@@ -10,8 +9,4 @@ import java.util.UUID;
  * meanwhile recovered and re-claimed changes nothing.
  */
 public record ClaimedTask(UUID id, TaskType type, String payload, int attempts, int maxAttempts) {
-
-    public static ClaimedTask from(BackgroundTask task) {
-        return new ClaimedTask(task.getId(), task.getType(), task.getPayload(), task.getAttempts(), task.getMaxAttempts());
-    }
 }

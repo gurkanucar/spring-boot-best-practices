@@ -15,18 +15,34 @@ server:
   port: 8099
 
 tasks:
+  # Yeni/yeniden denenecek işleri DB'den kontrol etme aralığı.
+  # İşin çalışma süresi değildir; önceki poll bittikten 2 saniye sonra tekrar bakılır.
   poll-interval: 2s
-  # Worker threads per instance. The poller never claims more tasks than there are free workers.
+
+  # Bu uygulama instance'ında aynı anda çalışabilecek TOPLAM iş sayısı.
+  # Bütün görev türleri bu 16 worker'ı paylaşır. Bekleyen işler DB'de PENDING kalır.
   workers: 16
-  # Maximum tasks of a type running at once on one instance. Unlisted types may use all workers.
+
+  # Görev TÜRÜ başına, aynı instance üzerindeki eşzamanlı iş üst sınırı.
+  # Ayrılmış worker sayısı değildir; her tür ayrıca toplam workers sınırına tabidir.
+  # Burada belirtilmeyen türler, havuzdaki boş kapasitenin tamamını kullanabilir.
+  # Mevcut ayarda 2 rapor çalışırken diğer işler için en fazla 14 worker kalır.
   concurrency:
     REPORT_GENERATION: 2
-    EMAIL_SEND: 30
-  # RUNNING longer than this counts as stalled (crashed instance) and is rescheduled.
-  # Must be longer than the slowest task, or a still-running task is started a second time.
+    # İsteğe bağlı ayrı limit örnekleri (açmak için yorum işaretini kaldır):
+    EMAIL_SEND: 10
+    REPORT_SHARE: 4
+
+  # Claim edildikten sonra 20 dakikadan uzun süre RUNNING kalan iş takılmış kabul edilir.
+  # Dakikada bir çalışan recovery bunu PENDING'e alır; deneme hakkı bittiyse DEAD yapar.
+  # İşin thread'ini DURDURMAZ. En uzun gerçek iş süresinden büyük tutulmalıdır;
+  # aksi halde hâlâ çalışan bir iş tekrar başlatılabilir. Tüm görev türleri için ortaktır.
   stuck-after: 20m
+
+  # Uygulama kapanırken başlamış işlerin bitmesini bekleme süresi; iş timeout'u değildir.
   shutdown-wait: 60s
-  # instance-id: defaults to hostname + random suffix
+  # Bütün kapasite limitleri instance başınadır: 3 instance -> en fazla 6 rapor, toplam 48 iş.
+  # instance-id: varsayılan hostname + rastgele ek; her instance için benzersiz olmalıdır.
 
 reports:
   # Protects against repeated export clicks: at most 3 requests per user in 10 minutes.

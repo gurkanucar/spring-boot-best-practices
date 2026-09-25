@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.springframework.aop.framework.ProxyFactory;
 import tools.jackson.databind.json.JsonMapper;
 
 class TaskRunnerTest {
@@ -57,6 +58,15 @@ class TaskRunnerTest {
         assertThatThrownBy(() -> reader.readValue("""
                 {"reportRequestId": 7, "from": "2026-09-01", "to": null, "columns": []}"""))
                 .hasMessageContaining("'to'");
+    }
+
+    @Test
+    void payloadTypeIsResolvedThroughAJdkProxy() {
+        var proxy = new ProxyFactory(new Handler<List<Long>>() {});
+        proxy.setInterfaces(TaskHandler.class);
+        var reader = TaskRunner.payloadReader((TaskHandler<?>) proxy.getProxy(), jsonMapper);
+        assertThat((List<?>) reader.readValue("[1,2]"))
+                .isEqualTo(List.of(1L, 2L));
     }
 
     @Test

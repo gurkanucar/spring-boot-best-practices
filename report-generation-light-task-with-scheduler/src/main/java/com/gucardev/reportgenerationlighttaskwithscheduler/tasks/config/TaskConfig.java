@@ -1,6 +1,5 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.scheduler.TaskPoller;
 import javax.sql.DataSource;
 import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.provider.jdbctemplate.JdbcTemplateLockProvider;
@@ -11,7 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
-@EnableSchedulerLock(defaultLockAtMostFor = "PT10M")
+@EnableSchedulerLock(defaultLockAtMostFor = "30s")
 public class TaskConfig {
 
     @Bean
@@ -22,11 +21,7 @@ public class TaskConfig {
                 .build());
     }
 
-    /**
-     * Fixed size, no queue: a submitted task starts right away or is rejected. The poller only
-     * claims as many tasks as there are free workers, so claimed tasks never wait in memory
-     * (where a crash would strand them as RUNNING).
-     */
+    /** Fixed pool, no in-memory backlog. Spring manages shutdown and the bounded wait. */
     @Bean
     ThreadPoolTaskExecutor taskWorkerExecutor(TaskProperties properties) {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -34,9 +29,8 @@ public class TaskConfig {
         executor.setMaxPoolSize(properties.workers());
         executor.setQueueCapacity(0);
         executor.setThreadNamePrefix("task-worker-");
-        // TaskPoller.stop() already waited for running tasks; whatever is left is interrupted and
-        // later rescheduled by stuck-task recovery.
-        executor.setWaitForTasksToCompleteOnShutdown(false);
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationMillis(properties.shutdownWait().toMillis());
         return executor;
     }
 }

@@ -1,18 +1,21 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository;
 
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
-import java.util.Collection;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskStatus;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * All state changes use the database clock ({@code now()}), so instances with skewed clocks agree.
+ * Claim uses JPA; the remaining native state updates belong to the PostgreSQL demo adapter.
  *
  * <p>The finishing updates only match the execution that owns the task: RUNNING, locked by this
  * instance, same attempt. They run in their own short transaction (REQUIRES_NEW), separate from
@@ -22,22 +25,21 @@ public interface BackgroundTaskRepository extends JpaRepository<BackgroundTask, 
 
     Optional<BackgroundTask> findByIdempotencyKey(String idempotencyKey);
 
-    // SKIP LOCKED: rows another transaction is claiming right now are skipped, not waited for.
-    @Query(value = """
-            select id from background_task
-            where status = 'PENDING' and run_at <= now()
-            order by run_at
-            limit :limit
-            for update skip locked""", nativeQuery = true)
-    List<UUID> lockEligibleIds(int limit);
+    long countByTypeAndStatusAndLockedBy(TaskType type, TaskStatus status, String lockedBy);
 
+    List<BackgroundTask> findByTypeAndStatusAndRunAtLessThanEqualOrderByRunAtAsc(
+            TaskType type, TaskStatus status, Instant now, Pageable page);
+
+    // The conditional update also protects a task if two dispatches ever overlap.
+    @Transactional
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(value = """
-            update background_task
-            set status = 'RUNNING', locked_at = now(), locked_by = :instanceId,
-                attempts = attempts + 1, updated_at = now()
-            where id in (:ids)""", nativeQuery = true)
-    int markRunning(Collection<UUID> ids, String instanceId);
+    @Query("""
+            update BackgroundTask t
+            set t.status = :running, t.lockedAt = :now, t.lockedBy = :instanceId,
+                t.attempts = t.attempts + 1, t.updatedAt = :now
+            where t.id = :id and t.status = :pending and t.attempts = :attempts""")
+    int markRunning(UUID id, String instanceId, int attempts, Instant now,
+                    TaskStatus pending, TaskStatus running);
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @Modifying
@@ -82,8 +84,10 @@ public interface BackgroundTaskRepository extends JpaRepository<BackgroundTask, 
     @Modifying
     @Query(value = """
             update background_task
-            set status = 'PENDING', run_at = now(), locked_at = null, locked_by = null,
-                last_error = 'recovered after stall', updated_at = now()
+            set status = case when attempts >= max_attempts then 'DEAD' else 'PENDING' end,
+                run_at = now(), locked_at = null, locked_by = null,
+                last_error = case when attempts >= max_attempts then 'attempt limit reached after stall'
+                                  else 'recovered after stall' end, updated_at = now()
             where status = 'RUNNING' and locked_at < now() - :stuckAfterSeconds * interval '1 second'""",
             nativeQuery = true)
     int recoverStuck(double stuckAfterSeconds);

@@ -3,13 +3,16 @@ package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.config.TaskProperties;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.dto.ClaimedTask;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.BackgroundTask;
+import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskStatus;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.ReportGenerationHandler;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
+import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,15 +62,32 @@ public class TaskService {
 
     /**
      * Claims up to {@code limit} due tasks for this instance: RUNNING, locked, attempts + 1.
-     * Rows locked by a concurrent claim are skipped, so two claims never get the same task.
+     * Called by the ShedLock-protected poller. Full task types remain PENDING in the database;
+     * no local permit counters and no claim/put-back loop for a full type.
      */
     @Transactional
     public List<ClaimedTask> claim(int limit) {
-        List<UUID> ids = repository.lockEligibleIds(limit);
-        if (ids.isEmpty()) {
-            return List.of();
+        List<ClaimedTask> claimed = new ArrayList<>();
+        Instant now = Instant.now();
+        for (TaskType type : TaskType.values()) {
+            if (claimed.size() >= limit) {
+                break;
+            }
+            long running = repository.countByTypeAndStatusAndLockedBy(
+                    type, TaskStatus.RUNNING, properties.instanceId());
+            int capacity = (int) Math.min(limit - claimed.size(), properties.concurrencyOf(type) - running);
+            if (capacity <= 0) {
+                continue;
+            }
+            for (BackgroundTask task : repository.findByTypeAndStatusAndRunAtLessThanEqualOrderByRunAtAsc(
+                    type, TaskStatus.PENDING, now, PageRequest.of(0, capacity))) {
+                if (repository.markRunning(task.getId(), properties.instanceId(), task.getAttempts(), now,
+                        TaskStatus.PENDING, TaskStatus.RUNNING) == 1) {
+                    claimed.add(new ClaimedTask(task.getId(), type, task.getPayload(),
+                            task.getAttempts() + 1, task.getMaxAttempts()));
+                }
+            }
         }
-        repository.markRunning(ids, properties.instanceId());
-        return repository.findAllById(ids).stream().map(ClaimedTask::from).toList();
+        return claimed;
     }
 }

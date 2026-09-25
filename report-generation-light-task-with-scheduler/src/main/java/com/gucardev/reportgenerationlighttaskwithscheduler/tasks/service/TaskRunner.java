@@ -7,22 +7,16 @@ import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.exception.NonRe
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.handler.TaskHandler;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
 import java.time.Duration;
-import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Semaphore;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.ResolvableType;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.type.TypeFactory;
 
 /** Runs one claimed task on a worker thread and records the outcome. */
 @Component
@@ -34,41 +28,20 @@ public class TaskRunner {
 
     private final Map<TaskType, TaskHandler<Object>> handlers = new EnumMap<>(TaskType.class);
     private final Map<TaskType, ObjectReader> payloadReaders = new EnumMap<>(TaskType.class);
-    private final Map<TaskType, Semaphore> typeSlots = new EnumMap<>(TaskType.class);
     private final BackgroundTaskRepository repository;
-    private final TransactionTemplate newTransaction;
     private final TaskProperties properties;
 
     @SuppressWarnings("unchecked")
     public TaskRunner(List<TaskHandler<?>> handlerBeans, BackgroundTaskRepository repository, JsonMapper jsonMapper,
-                      PlatformTransactionManager transactionManager, TaskProperties properties) {
+                      TaskProperties properties) {
         for (TaskHandler<?> handler : handlerBeans) {
             if (handlers.put(handler.type(), (TaskHandler<Object>) handler) != null) {
                 throw new IllegalStateException("More than one TaskHandler for " + handler.type());
             }
             payloadReaders.put(handler.type(), payloadReader(handler, jsonMapper));
         }
-        for (TaskType type : TaskType.values()) {
-            typeSlots.put(type, new Semaphore(properties.concurrencyOf(type)));
-        }
         this.repository = repository;
         this.properties = properties;
-        this.newTransaction = new TransactionTemplate(transactionManager);
-        this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-    }
-
-    public void run(ClaimedTask task) {
-        Semaphore slot = typeSlots.get(task.type());
-        // Never wait for a slot here: a blocked worker would be a wasted worker.
-        if (!slot.tryAcquire()) {
-            putBack(task);
-            return;
-        }
-        try {
-            execute(task);
-        } finally {
-            slot.release();
-        }
     }
 
     /** Returns a claimed task to PENDING without counting an attempt; it is tried again next poll. */
@@ -76,7 +49,7 @@ public class TaskRunner {
         repository.putBack(task.id(), properties.instanceId(), task.attempts(), seconds(properties.pollInterval()));
     }
 
-    private void execute(ClaimedTask task) {
+    public void run(ClaimedTask task) {
         Exception failure = null;
         try {
             TaskHandler<Object> handler = handlers.get(task.type());
@@ -84,9 +57,9 @@ public class TaskRunner {
                 throw new NonRetryableTaskException("No TaskHandler for " + task.type());
             }
             Object payload = readPayload(task);
-            // The handler's work commits in its own transaction; the status update below is another,
-            // short one. A long report does not hold the task row locked.
-            newTransaction.executeWithoutResult(status -> handler.handle(payload));
+            // Handlers own their short database transactions. Rendering and network calls should
+            // not keep a database connection/transaction open for the lifetime of the task.
+            handler.handle(payload);
         } catch (Exception e) {
             failure = e;
         }
@@ -120,31 +93,20 @@ public class TaskRunner {
     }
 
     /**
-     * Reads the stored JSON as {@code P} of {@code TaskHandler<P>} (resolved like Spring does for
-     * {@code ApplicationListener<E>}), with generics: {@code TaskHandler<List<Long>>} gets Longs.
+     * Jackson resolves {@code P} of {@code TaskHandler<P>}, including inherited generic types:
+     * {@code TaskHandler<List<Long>>} gets Longs without a custom type-resolution algorithm.
      * Every record field is required: a missing or null value fails here, once, for all handlers.
      */
     static ObjectReader payloadReader(TaskHandler<?> handler, JsonMapper jsonMapper) {
-        ResolvableType type = ResolvableType.forInstance(handler).as(TaskHandler.class).getGeneric(0);
-        if (type.resolve() == null) {
+        JavaType type = jsonMapper.getTypeFactory().constructType(AopUtils.getTargetClass(handler))
+                .findSuperType(TaskHandler.class).containedType(0);
+        if (type == null) {
             throw new IllegalStateException(handler.getClass().getName()
                     + " must declare its payload type, e.g. implements TaskHandler<Long>");
         }
-        return jsonMapper.readerFor(javaType(type, jsonMapper.getTypeFactory()))
+        return jsonMapper.readerFor(type)
                 .with(DeserializationFeature.FAIL_ON_MISSING_CREATOR_PROPERTIES,
                         DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES);
-    }
-
-    // Built from the resolved type, so P also works when it comes through a generic base class.
-    private static JavaType javaType(ResolvableType type, TypeFactory typeFactory) {
-        Class<?> raw = type.resolve(Object.class);
-        if (!type.hasGenerics()) {
-            return typeFactory.constructType(raw);
-        }
-        JavaType[] parameters = Arrays.stream(type.getGenerics())
-                .map(generic -> javaType(generic, typeFactory))
-                .toArray(JavaType[]::new);
-        return typeFactory.constructParametricType(raw, parameters);
     }
 
     /** 30s, 2m, 8m, 32m, then 1h. */

@@ -15,7 +15,9 @@ import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.exception.NonRe
  * a partially successful attempt. Running the same payload twice must not produce a second
  * report, a second email, a second charge...
  *
- * <p>{@link #handle} runs in its own transaction, which commits before the task is marked SUCCEEDED.
+ * <p>The runner does not open a transaction around {@link #handle}. Handlers own their short database
+ * transactions: commit business changes and follow-up tasks together, but render files and call
+ * external services outside those transactions. The task is marked SUCCEEDED after handle returns.
  * Throw {@link NonRetryableTaskException} for errors that retrying cannot fix; any other exception
  * is retried with backoff. A payload that cannot be converted to {@code P} is non-retryable too.
  */

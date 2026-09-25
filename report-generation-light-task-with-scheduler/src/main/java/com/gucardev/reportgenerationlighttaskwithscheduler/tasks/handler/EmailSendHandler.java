@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
  *
  * <p><b>Idempotent:</b> sending an email cannot be rolled back, and the task may run again after
  * the provider accepted the message but before the task was marked SUCCEEDED. Pass a stable
- * idempotency key to the mail provider (e.g. {@code "report-ready:" + reportId}), or record
- * sent emails in a table and check it first.
+ * idempotency key to the mail provider (e.g. {@code "report-ready:" + reportId}). A local sent-email
+ * flag alone cannot close the crash window between the external send and the database commit.
  */
 @Component
 @Slf4j

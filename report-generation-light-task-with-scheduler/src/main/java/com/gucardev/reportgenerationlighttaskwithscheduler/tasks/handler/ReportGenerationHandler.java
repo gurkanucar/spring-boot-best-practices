@@ -7,9 +7,10 @@ import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportRequestR
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity.TaskType;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.exception.NonRetryableTaskException;
 import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Payload: the report request id.
@@ -20,13 +21,21 @@ import org.springframework.stereotype.Component;
  * idempotency key, so a rerun cannot queue a second email either.
  */
 @Component
-@RequiredArgsConstructor
 @Slf4j
 public class ReportGenerationHandler implements TaskHandler<Long> {
 
     private final ReportRequestRepository requests;
     private final ReportRepository reports;
     private final TaskService tasks;
+    private final TransactionTemplate transaction;
+
+    public ReportGenerationHandler(ReportRequestRepository requests, ReportRepository reports,
+                                   TaskService tasks, PlatformTransactionManager transactionManager) {
+        this.requests = requests;
+        this.reports = reports;
+        this.tasks = tasks;
+        this.transaction = new TransactionTemplate(transactionManager);
+    }
 
     @Override
     public TaskType type() {
@@ -45,9 +54,14 @@ public class ReportGenerationHandler implements TaskHandler<Long> {
         log.info("Generating {} report for request {}", request.getReportType(), reportRequestId);
         // TODO: query the data, render the file (PDF/CSV), upload it to object storage and store its key.
         String content = "%s report for %s".formatted(request.getReportType(), request.getRequestedBy());
-        Report report = reports.save(Report.generated(reportRequestId, content));
-
-        tasks.enqueue(TaskType.EMAIL_SEND, report.getId(),
-                "report-ready-email:" + reportRequestId);
+        // Only persist the result and its notification atomically; expensive work stays above.
+        transaction.executeWithoutResult(status -> {
+            if (reports.existsByReportRequestId(reportRequestId)) {
+                return;
+            }
+            Report report = reports.save(Report.generated(reportRequestId, content));
+            tasks.enqueue(TaskType.EMAIL_SEND, report.getId(),
+                    "report-ready-email:" + reportRequestId);
+        });
     }
 }
