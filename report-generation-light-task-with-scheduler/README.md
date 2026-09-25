@@ -209,9 +209,9 @@ tasks:
 
 This allows up to 2 reports, 10 ready-notification emails and 4 sharing emails at once, subject to
 the shared 16-worker ceiling. These are ceilings, not reserved slots or guaranteed throughput:
-if only `EMAIL_SEND` tasks are pending, its limit of 10 leaves 6 workers idle. With the default
-configuration (only `REPORT_GENERATION: 2`), emails may instead use all 16 workers when no other
-tasks are running, or the remaining 14 while 2 reports run. `EMAIL_SEND` and `REPORT_SHARE` have
+if only `EMAIL_SEND` tasks are pending, its limit of 10 leaves 6 workers idle. Removing the
+`EMAIL_SEND` and `REPORT_SHARE` entries lets those types use all free workers: up to 16 when no
+reports are running, or 14 while 2 reports run. `EMAIL_SEND` and `REPORT_SHARE` have
 independent limits, not a combined mail-provider quota. Concurrency limits simultaneous work;
 it does not limit emails per second or minute.
 

@@ -1,0 +1,4 @@
+# Local development only. Protect the dashboard before exposing it outside your machine.
+jobrunr:
+  dashboard:
+    enabled: true

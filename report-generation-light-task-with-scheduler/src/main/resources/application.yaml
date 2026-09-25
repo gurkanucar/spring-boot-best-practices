@@ -15,34 +15,34 @@ server:
   port: 8099
 
 tasks:
-  # Yeni/yeniden denenecek işleri DB'den kontrol etme aralığı.
-  # İşin çalışma süresi değildir; önceki poll bittikten 2 saniye sonra tekrar bakılır.
+  # How often to check the database for new or retryable tasks.
+  # This is not a task timeout; the next check starts 2 seconds after the previous poll.
   poll-interval: 2s
 
-  # Bu uygulama instance'ında aynı anda çalışabilecek TOPLAM iş sayısı.
-  # Bütün görev türleri bu 16 worker'ı paylaşır. Bekleyen işler DB'de PENDING kalır.
+  # Total number of tasks that can run concurrently on this application instance.
+  # All task types share these 16 workers. Waiting tasks remain PENDING in the database.
   workers: 16
 
-  # Görev TÜRÜ başına, aynı instance üzerindeki eşzamanlı iş üst sınırı.
-  # Ayrılmış worker sayısı değildir; her tür ayrıca toplam workers sınırına tabidir.
-  # Burada belirtilmeyen türler, havuzdaki boş kapasitenin tamamını kullanabilir.
-  # Mevcut ayarda 2 rapor çalışırken diğer işler için en fazla 14 worker kalır.
+  # Per-type concurrency limits on this instance.
+  # These are not reserved workers; each type also shares the total worker limit.
+  # Types not listed here may use all available workers.
+  # With 2 reports running, up to 14 workers remain for other tasks.
   concurrency:
     REPORT_GENERATION: 2
-    # İsteğe bağlı ayrı limit örnekleri (açmak için yorum işaretini kaldır):
+    # Additional per-type limits; remove an entry to let that type use any free worker.
     EMAIL_SEND: 10
     REPORT_SHARE: 4
 
-  # Claim edildikten sonra 20 dakikadan uzun süre RUNNING kalan iş takılmış kabul edilir.
-  # Dakikada bir çalışan recovery bunu PENDING'e alır; deneme hakkı bittiyse DEAD yapar.
-  # İşin thread'ini DURDURMAZ. En uzun gerçek iş süresinden büyük tutulmalıdır;
-  # aksi halde hâlâ çalışan bir iş tekrar başlatılabilir. Tüm görev türleri için ortaktır.
+  # A claimed task still RUNNING after 20 minutes is considered stuck.
+  # Recovery runs once a minute and moves it to PENDING, or DEAD if retries are exhausted.
+  # This does not stop the task thread. Set this above the longest legitimate task duration,
+  # or a task that is still running may start again. Shared by all task types.
   stuck-after: 20m
 
-  # Uygulama kapanırken başlamış işlerin bitmesini bekleme süresi; iş timeout'u değildir.
+  # How long shutdown waits for running tasks; this is not a task timeout.
   shutdown-wait: 60s
-  # Bütün kapasite limitleri instance başınadır: 3 instance -> en fazla 6 rapor, toplam 48 iş.
-  # instance-id: varsayılan hostname + rastgele ek; her instance için benzersiz olmalıdır.
+  # All capacity limits are per instance: 3 instances allow up to 6 reports and 48 total tasks.
+  # instance-id defaults to hostname plus a random suffix and must be unique per instance.
 
 reports:
   # Protects against repeated export clicks: at most 3 requests per user in 10 minutes.

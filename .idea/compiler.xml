@@ -10,11 +10,12 @@
         <module name="rest-api-design" />
         <module name="caching" />
       </profile>
-      <profile name="Annotation profile for report-generation-light-task-with-scheduler" enabled="true">
+      <profile name="Annotation profile for report-generation-light-task-with-jobrunr" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
         <module name="kafka-outbox-pattern-flight-data-updates-example" />
@@ -30,6 +31,7 @@
         <module name="dto-field-masker" />
         <module name="quartz-scheduler-shedlock" />
         <module name="entity-encryption" />
+        <module name="report-generation-light-task-with-jobrunr" />
         <module name="slf4j-logging" />
         <module name="validation" />
         <module name="logbook-logging-requests" />
@@ -50,6 +52,7 @@
       <module name="kafka-outbox-pattern-flight-data-updates-example" options="-parameters" />
       <module name="logbook-logging-requests" options="-parameters" />
       <module name="quartz-scheduler-shedlock" options="-parameters" />
+      <module name="report-generation-light-task-with-jobrunr" options="-parameters" />
       <module name="report-generation-light-task-with-scheduler" options="-parameters" />
       <module name="rest-api-design" options="-parameters" />
       <module name="rest-api-integration" options="-parameters" />

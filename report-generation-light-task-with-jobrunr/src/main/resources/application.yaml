@@ -1,0 +1,44 @@
+spring:
+  application:
+    name: report-generation-light-task-with-jobrunr
+  datasource:
+    url: jdbc:postgresql://localhost:5435/reports_jobrunr
+    username: reports
+    password: reports
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8100
+
+jobrunr:
+  background-job-server:
+    enabled: true
+    # Total concurrent jobs per instance. The OSS edition has no per-type concurrency limit.
+    worker-count: 4
+    poll-interval-in-seconds: 5
+    interrupt-jobs-await-duration-on-stop: 60s
+    # JobRunr 8.7 property names for completed job history retention.
+    delete-succeeded-jobs-after: 36h
+    permanently-delete-deleted-jobs-after: 72h
+  jobs:
+    # Initial attempt plus 4 retries = up to 5 attempts. JobRunr applies the backoff.
+    default-number-of-retries: 4
+  dashboard:
+    # Enable locally with --spring.profiles.active=local.
+    enabled: false
+    port: 8001
+  miscellaneous:
+    allow-anonymous-data-usage: false
+
+tasks:
+  # Retry handoff of tasks committed to the database but not yet submitted to JobRunr.
+  # This is a JobRunr recurring job; there is no custom scheduler, worker, or retry engine.
+  dispatch-interval: PT30S
+
+reports:
+  rate-limit:
+    max-requests: 3
+    window: 10m
