@@ -34,7 +34,8 @@ they stay here on purpose so they are not forgotten.
 | [`file-operations-io`](file-operations-io/) | Secure file upload / download: Tika magic-byte detection, allow/block lists, size limits, UUID storage, security headers |
 | [`file-operations-s3`](file-operations-s3/) | The same on S3 (MinIO): public / private files, presigned upload and download URLs |
 | [`caching`](caching/) | Spring Cache with Caffeine (local) and Redis (distributed) |
-| [`resillience4j`](resillience4j/) | Retry, circuit breaker, rate limiter, bulkhead, time limiter |
+| [`resillience4j`](resillience4j/) | Retry, circuit breaker, outbound rate limiter, bulkhead, time limiter |
+| [`rate-limiting-bucket4j`](rate-limiting-bucket4j/) | Per-client API rate limiting with Bucket4j token buckets, in memory or shared in Redis |
 | [`slf4j-logging`](slf4j-logging/) | Logging with SLF4J: levels, MDC, structured logs, masking |
 | [`logbook-logging-requests`](logbook-logging-requests/) | HTTP request / response logging with Logbook |
 | [`kafka-outbox-pattern-flight-data-updates-example`](kafka-outbox-pattern-flight-data-updates-example/) | Transactional outbox with Kafka |
@@ -84,7 +85,7 @@ they stay here on purpose so they are not forgotten.
 - [ ] Webhooks
 - [ ] API gateways
 - [ ] BFF pattern
-- [ ] Rate limiting, throttling, quotas (see [Resilience](#9-resilience--fault-tolerance))
+- [ ] Rate limiting, throttling, quotas → [demo](rate-limiting-bucket4j/)
 
 ### Calling other systems
 
@@ -279,7 +280,7 @@ Avoid loading large files fully into memory when streaming is possible.
 - [ ] Retry, with exponential backoff and jitter
 - [ ] Circuit breaker
 - [ ] Bulkhead
-- [ ] Rate limiter
+- [ ] Rate limiter: outbound → [demo](resillience4j/), inbound per client → [demo](rate-limiting-bucket4j/)
 - [ ] Time limiter
 - [ ] Fallback strategies
 - [ ] Graceful degradation
@@ -722,6 +723,7 @@ Track hands-on experience honestly. Empty cells are fine: they show what is stil
 | Auditing / encryption / masking |  | [auditing](entity-auditing/), [encryption](entity-encryption/), [masking](dto-field-masker/) |  |  |
 | Caching / Redis |  | [caching](caching/) |  |  |
 | Resilience4j |  | [resillience4j](resillience4j/) |  |  |
+| Rate limiting |  | [rate-limiting-bucket4j](rate-limiting-bucket4j/) |  |  |
 | Logging |  | [slf4j](slf4j-logging/), [logbook](logbook-logging-requests/) |  |  |
 | Kafka |  | [outbox](kafka-outbox-pattern-flight-data-updates-example/), [inbox](kafka-inbox-pattern-airports-data-filling-example/) |  |  |
 | Outbox / Inbox pattern |  | [outbox](kafka-outbox-pattern-flight-data-updates-example/), [inbox](kafka-inbox-pattern-airports-data-filling-example/) |  |  |

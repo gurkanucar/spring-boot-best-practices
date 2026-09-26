@@ -10,10 +10,6 @@ spring:
       # holds our thread forever, and no retry or circuit breaker will ever see a failure.
       connect-timeout: 1s
       read-timeout: 5s
-  data:
-    redis:
-      host: localhost
-      port: 6381
 
 server:
   port: 8098
@@ -101,33 +97,6 @@ resilience4j:
         limit-refresh-period: 200ms
         timeout-duration: 5s                  # wait up to 5s for a permit, then RequestNotPermitted
 
-# ---------------------------------------------------------------------------------------
-# Inbound rate limiting of OUR api (/api/**), per client, not per IP. See README.
-# ---------------------------------------------------------------------------------------
-app:
-  rate-limit:
-    enabled: true
-    store: in-memory                          # in-memory | redis (redis = shared by all instances)
-    # X-Forwarded-For is only believed when the direct peer is one of these (our load balancer).
-    trusted-proxies:
-      - 127.0.0.1/32
-      - ::1/128
-    # Demo keys. In a real system keys live in a database, hashed, and are issued per client.
-    api-keys:
-      demo-free-key: { client-id: acme-mobile, plan: free }
-      demo-pro-key: { client-id: globex-backend, plan: pro }
-    plans:
-      free: { limit: 20, period: 1m }
-      pro: { limit: 200, period: 1m }
-    anonymous:
-      per-client: { limit: 5, period: 1m }    # one browser (anon_id cookie)
-      per-ip: { limit: 30, period: 1m }       # all anonymous traffic from one IP together
-    # Networks where many real people share one public IP (campus, office, carrier NAT).
-    shared-networks:
-      - name: campus
-        cidr: 10.20.0.0/16
-        per-ip: { limit: 300, period: 1m }
-
 management:
   endpoints:
     web:
@@ -139,6 +108,3 @@ management:
   health:
     circuitbreakers:
       enabled: true
-    # Redis is only needed with app.rate-limit.store=redis; do not report DOWN without it.
-    redis:
-      enabled: false

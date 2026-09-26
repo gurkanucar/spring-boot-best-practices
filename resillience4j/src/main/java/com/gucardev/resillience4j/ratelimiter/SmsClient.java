@@ -16,7 +16,7 @@ import org.springframework.web.client.RestClient;
  * and network delays bunch requests together.
  *
  * <p>This limiter is per application instance. With 3 instances the provider sees 3x the rate;
- * divide the limit by the number of instances, or use a shared limiter (see the ratelimit package).
+ * divide the limit by the number of instances, or use a limiter shared in Redis (see rate-limiting-bucket4j).
  */
 @Component
 public class SmsClient {

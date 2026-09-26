@@ -22,7 +22,6 @@
         <module name="er-one-to-many" />
         <module name="kafka-inbox-pattern-airports-data-filling-example" />
         <module name="er-one-to-one" />
-        <module name="resillience4j" />
         <module name="er-many-to-many" />
         <module name="swagger-openapi-docs" />
         <module name="jackson" />
@@ -35,7 +34,7 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for file-operations-s3" enabled="true">
+      <profile name="Annotation profile for resillience4j" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
@@ -45,6 +44,8 @@
         <module name="file-operations-s3" />
         <module name="report-generation-light-task-with-scheduler" />
         <module name="report-generation-light-task-with-jobrunr" />
+        <module name="resillience4j" />
+        <module name="java-email-sending" />
         <module name="file-operations-io" />
       </profile>
     </annotationProcessing>
@@ -61,6 +62,7 @@
       <module name="file-operations-io" options="-parameters" />
       <module name="file-operations-s3" options="-parameters" />
       <module name="jackson" options="-parameters" />
+      <module name="java-email-sending" options="-parameters" />
       <module name="kafka-inbox-pattern-airports-data-filling-example" options="-parameters" />
       <module name="kafka-outbox-pattern-flight-data-updates-example" options="-parameters" />
       <module name="logbook-logging-requests" options="-parameters" />

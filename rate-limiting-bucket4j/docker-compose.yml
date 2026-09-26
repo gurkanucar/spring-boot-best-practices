@@ -1,0 +1,7 @@
+# Only needed for the shared store: app.rate-limit.store=redis
+services:
+  redis:
+    image: redis:8.8-alpine
+    ports:
+      # 6382 on the host, so it does not clash with other Redis instances in this repository.
+      - "127.0.0.1:6382:6379"

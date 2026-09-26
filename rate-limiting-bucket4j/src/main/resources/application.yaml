@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: rate-limiting-bucket4j
+  data:
+    redis:
+      # Only used with app.rate-limit.store=redis (docker-compose.yml).
+      host: localhost
+      port: 6382
+      # Short: when Redis is slow or down, requests are let through (fail open) after this wait.
+      timeout: 500ms
+      connect-timeout: 500ms
+
+server:
+  port: 8097
+
+# ---------------------------------------------------------------------------------------
+# Inbound rate limiting of OUR api (/api/**), per client, not per IP. See README.
+# Every limit is a token bucket: `capacity` tokens, refilled evenly over `period`.
+# A list means all limits apply: "20 per minute AND 5 per second".
+# ---------------------------------------------------------------------------------------
+app:
+  rate-limit:
+    enabled: true
+    store: in-memory                          # in-memory | redis (redis = shared by all instances)
+    # X-Forwarded-For is only believed when the direct peer is one of these (our load balancer).
+    trusted-proxies:
+      - 127.0.0.1/32
+      - ::1/128
+    # Demo keys. In a real system keys live in a database, hashed, and are issued per client.
+    api-keys:
+      demo-free-key: { client-id: acme-mobile, plan: free }
+      demo-pro-key: { client-id: globex-backend, plan: pro }
+    plans:
+      free: [ { capacity: 20, period: 1m }, { capacity: 5, period: 1s } ]
+      pro: [ { capacity: 200, period: 1m }, { capacity: 20, period: 1s } ]
+    anonymous:
+      per-client: [ { capacity: 5, period: 1m } ]    # one browser (anon_id cookie)
+      per-ip: [ { capacity: 30, period: 1m } ]       # all anonymous traffic from one IP together
+    # Networks where many real people share one public IP (campus, office, carrier NAT).
+    shared-networks:
+      - name: campus
+        cidr: 10.20.0.0/16
+        per-ip: [ { capacity: 300, period: 1m } ]
+    # Tokens per request for expensive endpoints (default 1). A cost must fit into the smallest
+    # capacity of every caller who may use the endpoint, or that caller can never call it.
+    costs:
+      "[/api/reports/export]": 5
