@@ -42,10 +42,10 @@ public class StoredFile {
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt;
 
-    public static StoredFile create(String originalFilename, String extension, String contentType,
+    public static StoredFile create(UUID id, String originalFilename, String extension, String contentType,
                                     long size, String sha256) {
         StoredFile file = new StoredFile();
-        file.id = UUID.randomUUID();
+        file.id = id;
         file.originalFilename = originalFilename;
         file.extension = extension;
         file.contentType = contentType;

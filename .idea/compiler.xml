@@ -10,17 +10,6 @@
         <module name="rest-api-design" />
         <module name="caching" />
       </profile>
-      <profile name="Annotation profile for file-operations-io" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="report-generation-light-task-with-scheduler" />
-        <module name="report-generation-light-task-with-jobrunr" />
-        <module name="file-operations-io" />
-      </profile>
       <profile name="Annotation profile for validation" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -46,6 +35,18 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
+      <profile name="Annotation profile for file-operations-io" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="file-operations-s3" />
+        <module name="report-generation-light-task-with-scheduler" />
+        <module name="report-generation-light-task-with-jobrunr" />
+        <module name="file-operations-io" />
+      </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
@@ -58,6 +59,7 @@
       <module name="er-one-to-many" options="-parameters" />
       <module name="er-one-to-one" options="-parameters" />
       <module name="file-operations-io" options="-parameters" />
+      <module name="file-operations-s3" options="-parameters" />
       <module name="jackson" options="-parameters" />
       <module name="kafka-inbox-pattern-airports-data-filling-example" options="-parameters" />
       <module name="kafka-outbox-pattern-flight-data-updates-example" options="-parameters" />

@@ -25,6 +25,7 @@
         <option value="$PROJECT_DIR$/report-generation-light-task-with-jobrunr/pom.xml" />
         <option value="$PROJECT_DIR$/resillience4j/pom.xml" />
         <option value="$PROJECT_DIR$/file-operations-io/pom.xml" />
+        <option value="$PROJECT_DIR$/file-operations-s3/pom.xml" />
       </list>
     </option>
   </component>

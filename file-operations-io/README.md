@@ -10,7 +10,7 @@ Upload, list, download and delete files over a REST API, following the
 - files are stored on disk under a **UUID**; the **original filename** is kept as metadata in H2;
 - downloads are always attachments, with **security headers**.
 
-Spring Boot 4.1.1, Java 25, H2, Spring Data JPA, Apache Tika (`tika-core`).
+Spring Boot 4.1.1, Java 25, H2, Spring Data JPA, Apache Tika 4.0.0 (`tika-core`).
 
 ## Run
 
@@ -43,20 +43,22 @@ The H2 console (`/h2-console`, JDBC URL `jdbc:h2:file:./data/files`) runs only w
 A file must pass every step; nothing is kept when one fails.
 
 1. **Not empty** → otherwise `400`.
-2. **Size** — Spring's multipart limit (`413`) and a second byte count while copying to disk.
+2. **Size** — `spring.servlet.multipart.max-file-size` (fed from `file-storage.max-file-size`) makes
+   the servlet container reject a larger upload with `413` before any of our code runs.
 3. **Filename sanitizing** — path parts, control characters and characters such as `<>:"|?*` are
    removed, leading dots stripped, length capped. `../../secret.txt` becomes `secret.txt`.
    The name is only metadata; it is never used to build a disk path.
-4. **Temp file** — the upload is streamed to a temp file in the storage directory (never fully in
-   memory) and its SHA-256 is computed on the way.
-5. **Type detection** — Tika reads the magic bytes of the temp file, without the filename.
-6. **Rules** (`415` when one fails):
+4. **Type detection** — Tika reads the first bytes (magic bytes) of the upload, without the filename.
+   The container has already buffered the upload (on disk for large files), so it can be read twice
+   without holding it in memory.
+5. **Rules** (`415` when one fails):
    - the detected type, or any of its super types, is in `blocked-types`;
    - the detected type is not in `allowed-types`;
    - any extension in the name is in `blocked-extensions` (`invoice.pdf.exe`, `shell.php.png`);
    - the name has no extension, or its last extension is not allowed for the detected type
      (PNG bytes named `photo.pdf`).
-7. **Store** — the temp file is moved to `uploads/<uuid>` (no extension) and the metadata row saved.
+6. **Store** — only now is the upload streamed to `uploads/<uuid>` (no extension), with its SHA-256
+   computed on the way, and the metadata row saved. A rejected upload never reaches storage.
 
 ## Security checklist
 
@@ -68,7 +70,7 @@ Covered:
 | Dangerous file types | Allowlist; blocklist of executables, scripts, HTML, SVG, XML, archives |
 | Double extensions | Every extension in the name is checked |
 | Path traversal | Disk name is a UUID; original name sanitized and stored as metadata only |
-| Large uploads / disk filling | Multipart limit + byte count while streaming |
+| Large uploads / disk filling | Multipart size limit, enforced by the servlet container |
 | Stored XSS when a file is opened | `Content-Disposition: attachment`, detected `Content-Type`, `nosniff`, `CSP: sandbox` |
 | Header injection via filename | `ContentDisposition` builder encodes the name (`filename*=UTF-8''...`) |
 | Clickjacking / embedding | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `Cross-Origin-Resource-Policy: same-origin` |
@@ -82,7 +84,7 @@ Not covered (add them for production):
 - **Authentication and authorization** — who may upload, and who may download *which* file. Store the
   owner with the metadata and check it on every request. Spring Security also adds most of the
   headers above by default.
-- **Virus / malware scanning** — e.g. ClamAV on the temp file before step 7.
+- **Virus / malware scanning** — e.g. ClamAV on the upload before step 6.
 - **Rate limiting and quotas** per user.
 - **Office documents (DOCX, XLSX)** — they are ZIP containers, which `tika-core` detects as
   `application/zip` (blocked). Allowing them needs `tika-parsers-standard-package` for container
@@ -112,24 +114,32 @@ See `src/main/resources/application.yaml` for the full lists.
 
 ## Code
 
+Every component is used through an interface, so an implementation can be swapped without touching
+its callers (e.g. `LocalFileStorage` → an S3 storage, `TikaFileTypeDetector` → another detector).
+
 ```text
 file/
-  FileController          endpoints; FileResponse record
-  FileService             upload / list / get / download / delete
-  FileTypeValidator       filename sanitizing, Tika detection, allow / block rules
-  FileStorage             temp file with size limit and SHA-256, move, open, delete
-  StoredFile, StoredFileRepository
-  FileStorageProperties   the file-storage section of application.yaml
-  FileRejectedException   400 / 413 / 415 as ProblemDetail
+  FileController                          endpoints; FileResponse record
+  FileService          → FileServiceImpl  upload / list / get / download / delete
+  StoredFile, StoredFileRepository        metadata entity (H2)
+  FileStorageProperties                   the file-storage section of application.yaml
+  FileRejectedException                   400 / 413 / 415 as ProblemDetail
+file/storage/
+  FileStorage          → LocalFileStorage       store / open / delete by UUID
+file/validation/
+  FileValidator        → DefaultFileValidator   filename sanitizing, allow / block rules
+  FileTypeDetector     → TikaFileTypeDetector   magic-byte detection (the only Tika code)
 web/
-  SecurityHeadersFilter   OWASP response headers for /api/**
+  SecurityHeadersFilter                   OWASP response headers for /api/**
 ```
 
 ## Tests
 
-`./mvnw test` runs `FileControllerTest` with a temporary storage directory and a 1 KB limit:
+`./mvnw test` runs `FileControllerTest` (MockMvc, temporary storage directory):
 PNG / PDF upload and download (bytes, original name, headers), a non-ASCII filename (`Rapor Öğrenci.txt`)
 encoded in `Content-Disposition`, an EXE renamed to `.pdf`, HTML
 content, an extension that does not match the content, `shell.php.png`, no extension, path traversal
-in the name, a file over the limit, an empty file, unknown id, delete, and no leftover file after a
+in the name, an empty file, unknown id, delete, and no leftover file after a
 rejected upload.
+`UploadSizeLimitTest` sends a real HTTP request over the 1 KB test limit (`413`), because MockMvc
+skips the container's multipart size check.

@@ -1,47 +1,31 @@
-package com.gucardev.fileoperationsio.file;
+package com.gucardev.fileoperationsio.file.validation;
 
-import java.io.IOException;
+import com.gucardev.fileoperationsio.file.FileRejectedException;
+import com.gucardev.fileoperationsio.file.FileStorageProperties;
+import com.gucardev.fileoperationsio.file.validation.FileTypeDetector.DetectedType;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
-import org.apache.tika.Tika;
-import org.apache.tika.mime.MediaType;
-import org.apache.tika.mime.MediaTypeRegistry;
-import org.apache.tika.mime.MimeTypes;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
-/**
- * Decides whether an upload is accepted. The type comes from the file content (magic bytes), never
- * from the client's Content-Type header or the file extension.
- */
+/** The rules from the {@code file-storage} section of application.yaml. */
 @Component
 @RequiredArgsConstructor
-public class FileTypeValidator {
-
-    /** What an accepted file is stored as. */
-    public record AcceptedType(String contentType, String extension) {
-    }
+public class DefaultFileValidator implements FileValidator {
 
     // Control characters and characters that are illegal or special in common file systems.
     private static final Pattern UNSAFE_CHARACTERS = Pattern.compile("[\\p{Cntrl}<>:\"/\\\\|?*]");
 
-    private static final Tika TIKA = new Tika();
-    private static final MediaTypeRegistry REGISTRY = MimeTypes.getDefaultMimeTypes().getMediaTypeRegistry();
-
+    private final FileTypeDetector detector;
     private final FileStorageProperties properties;
 
-    /**
-     * Makes the client's filename safe to store and to send back in Content-Disposition:
-     * "../../etc/passwd.txt" becomes "passwd.txt". It is still never used as a disk path.
-     */
+    @Override
     public String sanitizeFilename(String originalFilename) {
         String name = originalFilename == null ? "" : originalFilename;
         name = name.substring(Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\')) + 1);
@@ -56,12 +40,14 @@ public class FileTypeValidator {
         return name.isEmpty() ? "file" : name;
     }
 
-    /** Throws {@link FileRejectedException} (415) unless the file passes every rule. */
-    public AcceptedType validate(Path file, String filename) {
-        MediaType detected = detect(file);
-        String type = detected.getBaseType().toString(); // without parameters such as charset
+    @Override
+    public AcceptedFile validate(InputStream content, String filename) {
+        DetectedType detected = detector.detect(content);
+        String type = detected.type();
 
-        if (isBlocked(detected)) {
+        // The type or any parent type: application/java-archive is blocked as application/zip.
+        if (Stream.concat(Stream.of(type), detected.superTypes().stream())
+                .anyMatch(properties.blockedTypes()::contains)) {
             throw reject("File type " + type + " is not allowed");
         }
         Set<String> allowedExtensions = properties.allowedTypes().get(type);
@@ -81,26 +67,7 @@ public class FileTypeValidator {
         if (!allowedExtensions.contains(extension)) {
             throw reject("File extension does not match its content (" + type + ")");
         }
-        return new AcceptedType(type, extension);
-    }
-
-    // Content only: without a filename hint Tika cannot be steered by the extension.
-    private static MediaType detect(Path file) {
-        try (InputStream in = Files.newInputStream(file)) {
-            return MediaType.parse(TIKA.detect(in));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    // A type is blocked when it or one of its super types is, e.g. application/java-archive -> application/zip.
-    private boolean isBlocked(MediaType type) {
-        for (MediaType current = type.getBaseType(); current != null; current = REGISTRY.getSupertype(current)) {
-            if (properties.blockedTypes().contains(current.toString())) {
-                return true;
-            }
-        }
-        return false;
+        return new AcceptedFile(type, extension);
     }
 
     private static List<String> extensionsOf(String filename) {

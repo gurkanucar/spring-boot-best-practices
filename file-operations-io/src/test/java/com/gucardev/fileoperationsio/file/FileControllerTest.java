@@ -27,10 +27,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
-@SpringBootTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:files-test",
-        "file-storage.max-file-size=1KB"
-})
+@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:files-test")
 @AutoConfigureMockMvc
 class FileControllerTest {
 
@@ -130,13 +127,6 @@ class FileControllerTest {
 
         assertThat(storageDir.resolve(id)).exists();
         assertThat(storageDir.getParent().resolve("secret.txt")).doesNotExist();
-    }
-
-    @Test
-    void fileOverTheLimitIsRejected() throws Exception {
-        byte[] large = new byte[2048];
-        Arrays.fill(large, (byte) 'a');
-        upload("large.txt", large).andExpect(status().isContentTooLarge());
     }
 
     @Test

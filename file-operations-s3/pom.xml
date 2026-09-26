@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.gucardev</groupId>
-    <artifactId>file-operations-io</artifactId>
+    <artifactId>file-operations-s3</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>file-operations-io</name>
-    <description>file-operations-io</description>
+    <name>file-operations-s3</name>
+    <description>file-operations-s3</description>
     <url/>
     <licenses>
         <license/>
@@ -41,13 +41,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
-        </dependency>
-
-        <!-- Content-based type detection (magic bytes). tika-core only: no document parsers. -->
-        <dependency>
-            <groupId>org.apache.tika</groupId>
-            <artifactId>tika-core</artifactId>
-            <version>4.0.0</version>
         </dependency>
 
         <dependency>

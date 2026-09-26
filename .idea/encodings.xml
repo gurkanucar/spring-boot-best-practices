@@ -9,6 +9,7 @@
     <file url="file://$PROJECT_DIR$/er-one-to-many/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/er-one-to-one/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/file-operations-io/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/file-operations-s3/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/jackson/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kafka-inbox-pattern-airports-data-filling-example/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/kafka-outbox-pattern-flight-data-updates-example/src/main/java" charset="UTF-8" />
