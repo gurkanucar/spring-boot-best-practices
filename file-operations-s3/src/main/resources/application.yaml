@@ -1,3 +1,87 @@
 spring:
   application:
     name: file-operations-s3
+  datasource:
+    # File-based H2, so metadata survives a restart together with the objects in MinIO.
+    url: jdbc:h2:file:./data/files
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      # Enabled only in the "local" profile (application-local.yaml).
+      enabled: false
+  servlet:
+    multipart:
+      # Uploads through the API: rejected by the servlet container before our code runs (413).
+      max-file-size: ${file-storage.max-file-size}
+      # A little above max-file-size: the multipart envelope adds a few bytes.
+      max-request-size: 11MB
+  mvc:
+    problemdetails:
+      # Errors are returned as RFC 9457 ProblemDetail JSON.
+      enabled: true
+
+file-storage:
+  # Also the largest size a presigned upload URL is issued for.
+  max-file-size: 10MB
+  max-filename-length: 255
+
+  s3:
+    # Local MinIO from docker-compose.yml. For AWS: remove endpoint, access-key, secret-key and
+    # path-style (credentials then come from the default chain, e.g. an IAM role).
+    endpoint: http://localhost:9000
+    region: eu-central-1
+    bucket: files
+    access-key: minioadmin
+    secret-key: minioadmin
+    path-style: true
+    # Creates the bucket, the public-read policy for public/* and the pending/ lifecycle rule.
+    # In AWS these belong to the infrastructure code: set to false.
+    create-bucket: true
+    # Public files are served from here. In AWS usually a CloudFront domain.
+    public-base-url: http://localhost:9000/files
+
+  presign:
+    # Keep presigned URLs short-lived: anyone who has the URL can use it until it expires.
+    upload-ttl: 10m
+    download-ttl: 5m
+
+  # Detected type (from the content, by Tika) -> extensions allowed for it.
+  # Brackets keep the "/" in map keys; without them Spring Boot drops it.
+  allowed-types:
+    "[application/pdf]": [pdf]
+    "[image/png]": [png]
+    "[image/jpeg]": [jpg, jpeg]
+    "[image/gif]": [gif]
+    # Magic bytes cannot tell CSV from plain text: both are detected as text/plain.
+    "[text/plain]": [txt, csv]
+
+  # Checked before the allowlist, including Tika's super types (e.g. application/java-archive is
+  # a sub type of application/zip). Defense in depth and a clear error message.
+  blocked-types:
+    - application/x-dosexec
+    - application/x-msdownload
+    - application/x-executable
+    - application/x-elf
+    - application/x-mach-o-executable
+    - application/x-sh
+    - application/x-bat
+    - application/javascript
+    - text/javascript
+    - text/html
+    - application/xhtml+xml
+    - image/svg+xml
+    - application/xml
+    - application/zip
+    - application/x-rar-compressed
+    - application/x-7z-compressed
+    - application/gzip
+    - application/x-tar
+
+  # Rejected anywhere in the name: "invoice.pdf.exe" and "shell.php.png" are both refused.
+  blocked-extensions:
+    [exe, dll, com, msi, scr, bat, cmd, ps1, vbs, sh, bash, js, mjs, jar, war, class,
+     php, phtml, jsp, jspx, asp, aspx, cgi, pl, py, rb, html, htm, xhtml, svg, xml, hta,
+     zip, rar, 7z, gz, tar]

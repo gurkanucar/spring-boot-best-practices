@@ -32,6 +32,7 @@ they stay here on purpose so they are not forgotten.
 | [`entity-encryption`](entity-encryption/) | Field-level encryption of JPA entity columns |
 | [`dto-field-masker`](dto-field-masker/) | Masking sensitive fields in DTOs |
 | [`file-operations-io`](file-operations-io/) | Secure file upload / download: Tika magic-byte detection, allow/block lists, size limits, UUID storage, security headers |
+| [`file-operations-s3`](file-operations-s3/) | The same on S3 (MinIO): public / private files, presigned upload and download URLs |
 | [`caching`](caching/) | Spring Cache with Caffeine (local) and Redis (distributed) |
 | [`resillience4j`](resillience4j/) | Retry, circuit breaker, rate limiter, bulkhead, time limiter |
 | [`slf4j-logging`](slf4j-logging/) | Logging with SLF4J: levels, MDC, structured logs, masking |
@@ -243,8 +244,8 @@ they stay here on purpose so they are not forgotten.
 - [ ] Streaming uploads / downloads
 - [ ] Large CSV / Excel processing (streaming, not loading all into memory)
 - [ ] Report generation (PDF / XLSX / CSV) in the background → [scheduler demo](report-generation-light-task-with-scheduler/), [JobRunr demo](report-generation-light-task-with-jobrunr/)
-- [ ] AWS S3 / object storage
-- [ ] Presigned URLs
+- [ ] AWS S3 / object storage → [demo](file-operations-s3/)
+- [ ] Presigned URLs (upload and download) → [demo](file-operations-s3/)
 - [ ] Multipart upload
 - [ ] MIME type validation (magic bytes, Apache Tika) and file size limits → [demo](file-operations-io/)
 - [ ] Virus / malware scanning concepts
@@ -728,7 +729,7 @@ Track hands-on experience honestly. Empty cells are fine: they show what is stil
 | Spring Security |  |  |  |  |
 | RabbitMQ |  |  |  |  |
 | Spring Batch |  |  |  |  |
-| S3 / file handling |  | [file-operations-io](file-operations-io/) |  |  |
+| S3 / file handling |  | [file-operations-io](file-operations-io/), [file-operations-s3](file-operations-s3/) |  |  |
 | Observability (metrics, tracing) |  |  |  |  |
 | Docker |  |  |  |  |
 | Kubernetes |  |  |  |  |
