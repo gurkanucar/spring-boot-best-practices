@@ -1,0 +1,196 @@
+### file-operations-s3 — example requests (IntelliJ IDEA HTTP Client)
+#
+# Start MinIO and the app first:  docker compose up -d  &&  ./mvnw spring-boot:run
+# Run the requests top to bottom: responses save ids and URLs in variables for the later requests.
+# Sample files are in ./samples. "fake-executable.pdf" is not a real program: only the "MZ" magic
+# bytes of a Windows executable followed by zeros.
+# MinIO console: http://localhost:9001 (minioadmin / minioadmin), bucket "files".
+
+@host = http://localhost:8080
+
+########## A. Upload through the API ##########
+
+### A1. PUBLIC upload — 201, "publicUrl" is a permanent URL
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="logo.png"
+Content-Type: image/png
+
+< ./samples/logo.png
+--boundary
+Content-Disposition: form-data; name="visibility"
+
+PUBLIC
+--boundary--
+
+> {%
+    client.test("created", () => client.assert(response.status === 201));
+    client.global.set("publicFileId", response.body.id);
+    client.global.set("publicUrl", response.body.publicUrl);
+%}
+
+### A2. Public URL — read straight from MinIO, no credentials (attachment, image/png)
+GET {{publicUrl}}
+
+### A3. PRIVATE upload — 201, no publicUrl
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="report.pdf"
+Content-Type: application/pdf
+
+< ./samples/report.pdf
+--boundary
+Content-Disposition: form-data; name="visibility"
+
+PRIVATE
+--boundary--
+
+> {% client.global.set("privateFileId", response.body.id); %}
+
+### A4. Private object without a signature — 403 from MinIO
+GET http://localhost:9000/files/private/{{privateFileId}}
+
+> {% client.test("forbidden", () => client.assert(response.status === 403)); %}
+
+### A5. Presigned download URL for the private file — valid for 5 minutes
+GET {{host}}/api/files/{{privateFileId}}/download-url
+
+> {% client.global.set("privateDownloadUrl", response.body.url); %}
+
+### A6. Download with the presigned URL — straight from MinIO (attachment, application/pdf)
+GET {{privateDownloadUrl}}
+
+### A7. Download through the API instead
+GET {{host}}/api/files/{{privateFileId}}/content
+
+### A8. REJECTED: executable bytes named .pdf — 415, nothing reaches S3
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="invoice.pdf"
+Content-Type: application/pdf
+
+< ./samples/fake-executable.pdf
+--boundary--
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+########## B. Presigned upload: client -> S3 directly ##########
+
+### B1. Ask for an upload URL — "size" must be the exact file size (report.pdf = 218 bytes)
+POST {{host}}/api/files/uploads
+Content-Type: application/json
+
+{
+  "filename": "report.pdf",
+  "size": 218,
+  "visibility": "PRIVATE"
+}
+
+> {%
+    client.test("created", () => client.assert(response.status === 201));
+    client.global.set("uploadId", response.body.id);
+    client.global.set("uploadUrl", response.body.url);
+%}
+
+### B2. PUT the bytes straight to MinIO (pending/<id>); Content-Length is set from the file
+PUT {{uploadUrl}}
+
+< ./samples/report.pdf
+
+> {% client.test("uploaded", () => client.assert(response.status === 200)); %}
+
+### B3. Complete — the server validates the bytes: 200 READY
+POST {{host}}/api/files/{{uploadId}}/complete
+
+> {% client.test("ready", () => client.assert(response.body.status === "READY")); %}
+
+### B4. Download the completed file
+GET {{host}}/api/files/{{uploadId}}/content
+
+### B5. REJECTED after upload: ask for a URL for "invoice.pdf" (fake-executable.pdf = 128 bytes)
+POST {{host}}/api/files/uploads
+Content-Type: application/json
+
+{
+  "filename": "invoice.pdf",
+  "size": 128,
+  "visibility": "PUBLIC"
+}
+
+> {%
+    client.global.set("badUploadId", response.body.id);
+    client.global.set("badUploadUrl", response.body.url);
+%}
+
+### B6. The PUT itself succeeds: S3 cannot check the content
+PUT {{badUploadUrl}}
+
+< ./samples/fake-executable.pdf
+
+### B7. Complete — 415; the pending object is deleted and the file is REJECTED, never readable
+POST {{host}}/api/files/{{badUploadId}}/complete
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+### B8. Its status
+GET {{host}}/api/files/{{badUploadId}}
+
+### B9. Size mismatch: declare 999 bytes ...
+POST {{host}}/api/files/uploads
+Content-Type: application/json
+
+{
+  "filename": "notes.txt",
+  "size": 999
+}
+
+> {% client.global.set("mismatchUploadUrl", response.body.url); %}
+
+### B10. ... then PUT notes.txt (36 bytes) — 403 from MinIO: Content-Length is part of the signature
+PUT {{mismatchUploadUrl}}
+
+< ./samples/notes.txt
+
+> {% client.test("refused by S3", () => client.assert(response.status === 403)); %}
+
+### B11. Blocked extension — refused before any upload URL is issued (415)
+POST {{host}}/api/files/uploads
+Content-Type: application/json
+
+{
+  "filename": "setup.exe",
+  "size": 128
+}
+
+### B12. Complete before uploading — 409
+POST {{host}}/api/files/uploads
+Content-Type: application/json
+
+{
+  "filename": "later.txt",
+  "size": 10
+}
+
+> {% client.global.set("notUploadedId", response.body.id); %}
+
+###
+POST {{host}}/api/files/{{notUploadedId}}/complete
+
+> {% client.test("conflict", () => client.assert(response.status === 409)); %}
+
+########## C. Listing and deleting ##########
+
+### C1. List — READY files only
+GET {{host}}/api/files?page=0&size=20
+
+### C2. Delete — 204; the object and its metadata are gone
+DELETE {{host}}/api/files/{{publicFileId}}
+
+### C3. The public URL no longer works — 404 from MinIO
+GET {{publicUrl}}

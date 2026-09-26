@@ -1,0 +1,134 @@
+### file-operations-io — example requests (IntelliJ IDEA HTTP Client)
+#
+# Start the app first:  ./mvnw spring-boot:run
+# Run the requests top to bottom: uploads save the returned id in {{fileId}} for the later requests.
+# Sample files are in ./samples. "fake-executable.pdf" is not a real program: only the "MZ" magic
+# bytes of a Windows executable followed by zeros.
+
+@host = http://localhost:8080
+
+### 1. Upload a PNG — 201, contentType detected from the bytes: image/png
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="logo.png"
+Content-Type: image/png
+
+< ./samples/logo.png
+--boundary--
+
+> {%
+    client.test("created", () => client.assert(response.status === 201));
+    client.global.set("fileId", response.body.id);
+%}
+
+### 2. Metadata
+GET {{host}}/api/files/{{fileId}}
+
+### 3. Download — attachment with the original name, security headers (nosniff, CSP sandbox, ...)
+GET {{host}}/api/files/{{fileId}}/content
+
+### 4. List — newest first, paged
+GET {{host}}/api/files?page=0&size=20
+
+### 5. Upload a PDF
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="report.pdf"
+Content-Type: application/pdf
+
+< ./samples/report.pdf
+--boundary--
+
+### 6. Non-ASCII filename — kept as is, encoded in Content-Disposition (filename*=UTF-8''...)
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="résumé.txt"
+Content-Type: text/plain
+
+< ./samples/résumé.txt
+--boundary--
+
+> {% client.global.set("unicodeFileId", response.body.id); %}
+
+### 6b. Download it — check the Content-Disposition header
+GET {{host}}/api/files/{{unicodeFileId}}/content
+
+### 7. Path traversal in the name — stored as "notes.txt", on disk as uploads/<uuid>
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="../../notes.txt"
+Content-Type: text/plain
+
+< ./samples/notes.txt
+--boundary--
+
+> {% client.test("name sanitized", () => client.assert(response.body.originalFilename === "notes.txt")); %}
+
+### 8. REJECTED: executable bytes named .pdf — 415 (the client's Content-Type is ignored)
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="invoice.pdf"
+Content-Type: application/pdf
+
+< ./samples/fake-executable.pdf
+--boundary--
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+### 9. REJECTED: HTML content, even when named .txt — 415 (blocked type)
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="page.txt"
+Content-Type: text/plain
+
+< ./samples/page.html
+--boundary--
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+### 10. REJECTED: PNG bytes named .pdf — 415 (extension does not match the content)
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="photo.pdf"
+Content-Type: application/pdf
+
+< ./samples/logo.png
+--boundary--
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+### 11. REJECTED: blocked extension in the middle of the name — 415
+POST {{host}}/api/files
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="file"; filename="shell.php.png"
+Content-Type: image/png
+
+< ./samples/logo.png
+--boundary--
+
+> {% client.test("rejected", () => client.assert(response.status === 415)); %}
+
+### 12. Unknown id — 404 ProblemDetail
+GET {{host}}/api/files/00000000-0000-0000-0000-000000000000
+
+### 13. Delete — 204; file and metadata are gone
+DELETE {{host}}/api/files/{{fileId}}
+
+### 14. Deleted file — 404
+GET {{host}}/api/files/{{fileId}}

@@ -76,13 +76,13 @@ class FileControllerTest {
 
     @Test
     void nonAsciiFilenameIsKeptAndEncodedInContentDisposition() throws Exception {
-        String id = idOf(upload("Rapor Öğrenci.txt", TEXT)
+        String id = idOf(upload("résumé.txt", TEXT)
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.originalFilename").value("Rapor Öğrenci.txt")));
+                .andExpect(jsonPath("$.originalFilename").value("résumé.txt")));
 
         mvc.perform(get("/api/files/{id}/content", id))
                 .andExpect(header().string("Content-Disposition",
-                        containsString("filename*=UTF-8''Rapor%20%C3%96%C4%9Frenci.txt")));
+                        containsString("filename*=UTF-8''r%C3%A9sum%C3%A9.txt")));
     }
 
     @Test

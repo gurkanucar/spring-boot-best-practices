@@ -35,6 +35,10 @@ curl -i -F "file=@setup.exe;filename=invoice.pdf" http://localhost:8080/api/file
 # 415 {"title":"Unsupported Media Type","detail":"File type application/x-msdownload is not allowed", ...}
 ```
 
+Ready-made requests for every case (uploads, downloads and each rejection) are in
+[`http/requests.http`](http/requests.http) (IntelliJ IDEA HTTP Client), with sample files in
+`http/samples/`. Run them top to bottom: ids and URLs from responses are passed on in variables.
+
 Metadata is stored in `./data` (H2 file database) and file bytes in `./uploads`. Both are git-ignored.
 The H2 console (`/h2-console`, JDBC URL `jdbc:h2:file:./data/files`) runs only with the `local` profile.
 
@@ -136,7 +140,7 @@ web/
 ## Tests
 
 `./mvnw test` runs `FileControllerTest` (MockMvc, temporary storage directory):
-PNG / PDF upload and download (bytes, original name, headers), a non-ASCII filename (`Rapor Öğrenci.txt`)
+PNG / PDF upload and download (bytes, original name, headers), a non-ASCII filename (`résumé.txt`)
 encoded in `Content-Disposition`, an EXE renamed to `.pdf`, HTML
 content, an extension that does not match the content, `shell.php.png`, no extension, path traversal
 in the name, an empty file, unknown id, delete, and no leftover file after a

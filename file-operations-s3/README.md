@@ -20,6 +20,10 @@ docker compose up -d        # MinIO: S3 API on :9000, console on :9001 (minioadm
 ./mvnw spring-boot:run      # creates the bucket "files", its public-read policy and lifecycle rule
 ```
 
+Ready-made requests for every case (uploads, downloads and each rejection) are in
+[`http/requests.http`](http/requests.http) (IntelliJ IDEA HTTP Client), with sample files in
+`http/samples/`. Run them top to bottom: ids and URLs from responses are passed on in variables.
+
 MinIO no longer publishes community images; `docker-compose.yml` and the tests pin the last one,
 `minio/minio:RELEASE.2025-04-22T22-12-26Z`. Unlike simple S3 mocks, it enforces bucket policies and
 presigned signatures, so the public/private rules are really tested.
