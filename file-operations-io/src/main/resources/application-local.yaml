@@ -1,0 +1,5 @@
+# Local development only. The H2 console needs frames, so never enable it on a public server.
+spring:
+  h2:
+    console:
+      enabled: true

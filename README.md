@@ -31,6 +31,7 @@ they stay here on purpose so they are not forgotten.
 | [`entity-auditing`](entity-auditing/) | Entity auditing and history with Hibernate Envers |
 | [`entity-encryption`](entity-encryption/) | Field-level encryption of JPA entity columns |
 | [`dto-field-masker`](dto-field-masker/) | Masking sensitive fields in DTOs |
+| [`file-operations-io`](file-operations-io/) | Secure file upload / download: Tika magic-byte detection, allow/block lists, size limits, UUID storage, security headers |
 | [`caching`](caching/) | Spring Cache with Caffeine (local) and Redis (distributed) |
 | [`resillience4j`](resillience4j/) | Retry, circuit breaker, rate limiter, bulkhead, time limiter |
 | [`slf4j-logging`](slf4j-logging/) | Logging with SLF4J: levels, MDC, structured logs, masking |
@@ -238,14 +239,14 @@ they stay here on purpose so they are not forgotten.
 
 ## 7. Files, Reports & Object Storage
 
-- [ ] File upload / download
+- [ ] File upload / download → [demo](file-operations-io/)
 - [ ] Streaming uploads / downloads
 - [ ] Large CSV / Excel processing (streaming, not loading all into memory)
 - [ ] Report generation (PDF / XLSX / CSV) in the background → [scheduler demo](report-generation-light-task-with-scheduler/), [JobRunr demo](report-generation-light-task-with-jobrunr/)
 - [ ] AWS S3 / object storage
 - [ ] Presigned URLs
 - [ ] Multipart upload
-- [ ] MIME type validation and file size limits
+- [ ] MIME type validation (magic bytes, Apache Tika) and file size limits → [demo](file-operations-io/)
 - [ ] Virus / malware scanning concepts
 - [ ] Temporary files
 - [ ] Retention policies and lifecycle rules
@@ -334,7 +335,7 @@ Retries are not automatically safe. Before retrying, think about:
 - [ ] XSS
 - [ ] SQL injection
 - [ ] SSRF
-- [ ] Secure headers
+- [ ] Secure headers → [demo](file-operations-io/)
 - [ ] Dependency vulnerabilities
 
 ---
@@ -727,7 +728,7 @@ Track hands-on experience honestly. Empty cells are fine: they show what is stil
 | Spring Security |  |  |  |  |
 | RabbitMQ |  |  |  |  |
 | Spring Batch |  |  |  |  |
-| S3 / file handling |  |  |  |  |
+| S3 / file handling |  | [file-operations-io](file-operations-io/) |  |  |
 | Observability (metrics, tracing) |  |  |  |  |
 | Docker |  |  |  |  |
 | Kubernetes |  |  |  |  |

@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: file-operations-io
+  datasource:
+    # File-based H2, so metadata survives a restart together with the files in ./uploads.
+    url: jdbc:h2:file:./data/files
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+  h2:
+    console:
+      # Enabled only in the "local" profile (application-local.yaml).
+      enabled: false
+  servlet:
+    multipart:
+      # Spring rejects oversized uploads before they reach the controller (413).
+      max-file-size: ${file-storage.max-file-size}
+      # A little above max-file-size: the multipart envelope adds a few bytes.
+      max-request-size: 11MB
+  mvc:
+    problemdetails:
+      # Errors are returned as RFC 9457 ProblemDetail JSON.
+      enabled: true
+
+file-storage:
+  # Files are stored here as <uuid>, without extension, outside any web root.
+  directory: ./uploads
+  max-file-size: 10MB
+  max-filename-length: 255
+
+  # Detected type (from the content, by Tika) -> extensions allowed for it.
+  # Brackets keep the "/" in map keys; without them Spring Boot drops it.
+  allowed-types:
+    "[application/pdf]": [pdf]
+    "[image/png]": [png]
+    "[image/jpeg]": [jpg, jpeg]
+    "[image/gif]": [gif]
+    # Magic bytes cannot tell CSV from plain text: both are detected as text/plain.
+    "[text/plain]": [txt, csv]
+
+  # Checked before the allowlist, including Tika's super types (e.g. application/java-archive is
+  # a sub type of application/zip). Defense in depth and a clear error message.
+  blocked-types:
+    - application/x-dosexec
+    - application/x-msdownload
+    - application/x-executable
+    - application/x-elf
+    - application/x-mach-o-executable
+    - application/x-sh
+    - application/x-bat
+    - application/javascript
+    - text/javascript
+    - text/html
+    - application/xhtml+xml
+    - image/svg+xml
+    - application/xml
+    - application/zip
+    - application/x-rar-compressed
+    - application/x-7z-compressed
+    - application/gzip
+    - application/x-tar
+
+  # Rejected anywhere in the name: "invoice.pdf.exe" and "shell.php.png" are both refused.
+  blocked-extensions:
+    [exe, dll, com, msi, scr, bat, cmd, ps1, vbs, sh, bash, js, mjs, jar, war, class,
+     php, phtml, jsp, jspx, asp, aspx, cgi, pl, py, rb, html, htm, xhtml, svg, xml, hta,
+     zip, rar, 7z, gz, tar]
