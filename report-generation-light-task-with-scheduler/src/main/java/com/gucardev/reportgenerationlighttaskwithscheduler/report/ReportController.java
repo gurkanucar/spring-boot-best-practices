@@ -5,11 +5,7 @@ import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportService.
 import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportService.ReportView;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,12 +43,5 @@ public class ReportController {
     @PostMapping("/{id}/share")
     public ResponseEntity<ReportShared> share(@PathVariable Long id, @RequestBody ShareBody body) {
         return ResponseEntity.accepted().body(service.share(id, body.recipientEmail()));
-    }
-
-    @ExceptionHandler(TooManyReportRequestsException.class)
-    public ResponseEntity<ProblemDetail> tooMany(TooManyReportRequestsException ex) {
-        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
-                .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getRetryAfter().toSeconds()))
-                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()));
     }
 }

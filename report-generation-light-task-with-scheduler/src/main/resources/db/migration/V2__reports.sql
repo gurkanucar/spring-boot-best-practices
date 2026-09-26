@@ -1,4 +1,4 @@
--- Demo business data for the task handlers.
+-- Demo business data for the report tasks.
 create table report_request (
     id           bigint       generated always as identity primary key,
     report_type  varchar(50)  not null,                    -- e.g. MONTHLY_SALES
@@ -14,6 +14,3 @@ create table report (
     -- One report per request, even if a generation task runs twice.
     constraint uk_report_request unique (report_request_id)
 );
-
--- The rate limit check: "requests of this user in the last 10 minutes".
-create index ix_report_request_user_time on report_request (requested_by, created_at);

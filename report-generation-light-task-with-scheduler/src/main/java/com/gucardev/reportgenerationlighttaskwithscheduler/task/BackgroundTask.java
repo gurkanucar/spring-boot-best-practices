@@ -1,7 +1,5 @@
-package com.gucardev.reportgenerationlighttaskwithscheduler.tasks.entity;
+package com.gucardev.reportgenerationlighttaskwithscheduler.task;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.repository.BackgroundTaskRepository;
-import com.gucardev.reportgenerationlighttaskwithscheduler.tasks.service.TaskService;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -17,9 +15,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 /**
- * Read-only mapping of a task row. Rows are inserted and moved between states with targeted SQL in
- * {@link TaskService} and {@link BackgroundTaskRepository}, so concurrent updates cannot overwrite
- * each other through stale entities.
+ * Read-only mapping of a task row. Rows are inserted and moved between states with targeted SQL
+ * ({@link TaskService}, {@link BackgroundTaskRepository}), never by saving a possibly stale entity.
  */
 @Entity
 @Table(name = "background_task")
@@ -27,12 +24,16 @@ import org.hibernate.type.SqlTypes;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BackgroundTask {
 
+    public enum Status { PENDING, RUNNING, SUCCEEDED, DEAD }
+
+    public enum Type { REPORT_GENERATION, EMAIL_SEND, REPORT_SHARE }
+
     @Id
     private UUID id;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TaskType type;
+    private Type type;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
@@ -40,7 +41,7 @@ public class BackgroundTask {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TaskStatus status;
+    private Status status;
 
     @Column(nullable = false)
     private int attempts;
@@ -54,9 +55,6 @@ public class BackgroundTask {
     @Column(name = "locked_at")
     private Instant lockedAt;
 
-    @Column(name = "locked_by")
-    private String lockedBy;
-
     @Column(name = "last_error")
     private String lastError;
 
@@ -66,6 +64,6 @@ public class BackgroundTask {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "idempotency_key")
+    @Column(name = "idempotency_key", nullable = false)
     private String idempotencyKey;
 }

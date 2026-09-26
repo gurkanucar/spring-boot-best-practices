@@ -32,13 +32,3 @@ jobrunr:
     port: 8001
   miscellaneous:
     allow-anonymous-data-usage: false
-
-tasks:
-  # Retry handoff of tasks committed to the database but not yet submitted to JobRunr.
-  # This is a JobRunr recurring job; there is no custom scheduler, worker, or retry engine.
-  dispatch-interval: PT30S
-
-reports:
-  rate-limit:
-    max-requests: 3
-    window: 10m

@@ -10,15 +10,6 @@
         <module name="rest-api-design" />
         <module name="caching" />
       </profile>
-      <profile name="Annotation profile for resillience4j" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="resillience4j" />
-      </profile>
       <profile name="Annotation profile for validation" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -31,7 +22,6 @@
         <module name="er-one-to-many" />
         <module name="kafka-inbox-pattern-airports-data-filling-example" />
         <module name="er-one-to-one" />
-        <module name="report-generation-light-task-with-scheduler" />
         <module name="er-many-to-many" />
         <module name="swagger-openapi-docs" />
         <module name="jackson" />
@@ -41,9 +31,19 @@
         <module name="quartz-scheduler-shedlock" />
         <module name="entity-encryption" />
         <module name="slf4j-logging" />
-        <module name="report-generation-light-task-with-jobrunr" />
         <module name="validation" />
         <module name="logbook-logging-requests" />
+      </profile>
+      <profile name="Annotation profile for report-generation-light-task-with-scheduler" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="report-generation-light-task-with-scheduler" />
+        <module name="report-generation-light-task-with-jobrunr" />
+        <module name="resillience4j" />
       </profile>
     </annotationProcessing>
   </component>
