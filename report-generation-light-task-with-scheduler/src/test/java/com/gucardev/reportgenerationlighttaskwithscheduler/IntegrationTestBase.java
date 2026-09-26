@@ -2,7 +2,7 @@ package com.gucardev.reportgenerationlighttaskwithscheduler;
 
 import static org.awaitility.Awaitility.await;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportMailer;
+import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportEmailSender;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +13,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** One application context for all tests: fast polling, 1s first retry, a mocked mailer. */
+/** One application context for all tests: fast polling, 1s first retry, a mocked email sender. */
 @SpringBootTest(properties = {"tasks.poll-interval=100ms", "tasks.first-retry-delay=1s"})
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
@@ -26,7 +26,7 @@ public abstract class IntegrationTestBase {
     @Autowired
     protected JdbcClient jdbc;
     @MockitoBean
-    protected ReportMailer mailer;
+    protected ReportEmailSender reportEmailSender;
 
     @AfterEach
     void cleanUp() {

@@ -1,6 +1,6 @@
 package com.gucardev.reportgenerationlighttaskwithscheduler.task;
 
-import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportTasks;
+import com.gucardev.reportgenerationlighttaskwithscheduler.report.ReportTaskHandler;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -18,16 +18,17 @@ public class TaskWorker {
     private static final int MAX_ERROR_LENGTH = 2000;
 
     private final BackgroundTaskRepository tasks;
-    private final ReportTasks reportTasks;
+    private final ReportTaskHandler reportTaskHandler;
     private final ThreadPoolTaskExecutor executor;
     private final Duration firstRetryDelay;
     private final Duration stuckAfter;
 
-    public TaskWorker(BackgroundTaskRepository tasks, ReportTasks reportTasks, ThreadPoolTaskExecutor taskWorkerExecutor,
+    public TaskWorker(BackgroundTaskRepository tasks, ReportTaskHandler reportTaskHandler,
+                      ThreadPoolTaskExecutor taskWorkerExecutor,
                       @Value("${tasks.first-retry-delay:30s}") Duration firstRetryDelay,
                       @Value("${tasks.stuck-after:20m}") Duration stuckAfter) {
         this.tasks = tasks;
-        this.reportTasks = reportTasks;
+        this.reportTaskHandler = reportTaskHandler;
         this.executor = taskWorkerExecutor;
         this.firstRetryDelay = firstRetryDelay;
         this.stuckAfter = stuckAfter;
@@ -66,7 +67,7 @@ public class TaskWorker {
     // No transaction around the handler: it owns its short transactions.
     private void run(BackgroundTask task) {
         try {
-            reportTasks.run(task.getType(), task.getPayload());
+            reportTaskHandler.handle(task.getType(), task.getPayload());
         } catch (Exception e) {
             Duration delay = backoff(task.getAttempts());
             tasks.markFailed(task.getId(), task.getAttempts(), delay.toMillis() / 1000.0, summarize(e));

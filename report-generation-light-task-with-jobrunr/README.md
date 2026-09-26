@@ -2,12 +2,15 @@
 
 Spring Boot 4.1.1, Java 25, JobRunr **8.7.0 OSS**, PostgreSQL 17.
 
-A user requests a report and gets `202 Accepted`. A JobRunr job generates the report, then a
-separate job emails the owner. A finished report can be shared with another recipient. JobRunr
-owns job storage, workers, retries and crash recovery; there is no custom worker or task table.
+1. `POST /api/reports` - the request is saved and the user gets `202 Accepted`.
+2. A background job generates the report.
+3. A second background job sends the "report ready" email.
 
-Report content is a demo string and `ReportMailer` only logs a `DEMO` line, so no mail account
-is needed.
+The client polls `GET /api/reports/{id}` until `ready` is true. JobRunr owns job storage, workers,
+retries and crash recovery; there is no custom worker or task table.
+
+Report content is a demo string and `ReportEmailSender` only logs a `DEMO` line, so no mail
+account is needed.
 
 ## Run
 
@@ -30,40 +33,39 @@ curl -i -X POST http://localhost:8100/api/reports \
 
 curl http://localhost:8100/api/reports/1
 # {"ready":true,"content":"MONTHLY_SALES report for alice@example.com",...}
-
-curl -i -X POST http://localhost:8100/api/reports/1/share \
-  -H "Content-Type: application/json" \
-  -d '{"recipientEmail":"bob@example.com"}'
-# 202 {"jobId":"..."}  same report + same recipient returns the same jobId
-# 404 unknown request, 409 report not ready yet
 ```
 
 ## Flow
 
 ```text
-POST /api/reports
-  └─ save report_request → enqueue generate(requestId)          job id = jobId("generate:<id>")
-       └─ ReportJobs.generate: save report (if missing)
-            └─ enqueue sendReadyEmail(reportId)                  job id = jobId("ready:<id>")
-                 └─ ReportMailer.send(owner)
+1. POST /api/reports → ReportService.requestReport()
+     save report_request, scheduleReportGeneration(id)       job id from "generate-report:<id>"
+2. job ReportJobs.generateReport(id) → ReportGenerator.generateReport(id)
+     save report (if missing), scheduleReportReadyEmail(id)  job id from "report-ready-email:<id>"
+3. job ReportJobs.sendReportReadyEmail(id) → ReportEmailSender.sendReportReadyEmail(id)
 
-POST /api/reports/{id}/share
-  └─ enqueue share(reportId, recipient)                          job id = jobId("share:<report>:<recipient>")
-       └─ ReportMailer.send(recipient)
+GET /api/reports/{id} → ReportService.getReport()            poll until ready
 ```
 
 ## Files
 
 ```text
 ReportGenerationLightTaskWithJobrunrApplication
-report/
-  ReportController                    endpoints, request bodies
-  ReportService                       request(), get(), share(), response records
+report/                               plain Spring, no JobRunr imports
+  ReportController                    POST /api/reports, GET /api/reports/{id}
+  ReportService                       requestReport(), getReport(), response records
+  ReportGenerator                     generateReport(): idempotent, one report per request
+  ReportEmailSender                   sendReportReadyEmail(): demo, logs with an idempotency key
   ReportRequest, Report               entities
   ReportRequestRepository, ReportRepository
-  ReportJobs                          @Job generate / sendReadyEmail / share, jobId(key)
-  ReportMailer                        demo mail adapter
+jobrunr/                              everything JobRunr
+  ReportJobScheduler                  the only JobScheduler caller, fixed job ids
+  ReportJobs                          @Job methods that only delegate to report/
 ```
+
+The business code in `report/` is plain Spring and can be read and tested without JobRunr.
+Replacing JobRunr only touches `jobrunr/`. `ReportService` just asks `ReportJobScheduler` to
+schedule the first job.
 
 ## Guarantees
 
@@ -71,22 +73,22 @@ report/
 - **Retries** - a failing job is retried with exponential backoff (`default-number-of-retries: 4`,
   so up to 5 attempts), then stays `FAILED` in the dashboard for a human.
 - **No duplicate jobs** - job ids are `UUID.nameUUIDFromBytes(key)`. JobRunr does not create a
-  second job with an existing id, so enqueueing the same key again is harmless. (After JobRunr
+  second job with an existing id, so scheduling the same key again is a no-op. (After JobRunr
   permanently deletes old job history, the same key can create a new job.)
 - **One report per request** - a unique constraint on `report.report_request_id`; a concurrent
   duplicate insert is caught and the existing report is used.
-- **A saved report always gets its email** - `generate` enqueues the email job even when the report
-  already exists. If that enqueue fails, JobRunr retries `generate`, which skips generation and
-  enqueues again.
-- The mailer gets the job id as an idempotency key. A job can still run twice (crash mid-send), so
-  a real mail provider should deduplicate on that key.
+- **A saved report always gets its email** - `generateReport` schedules the email job even when the
+  report already exists. If that fails, JobRunr retries `generateReport`, which skips generation
+  and schedules again.
+- `ReportEmailSender` uses `report-ready-email:<id>` as an idempotency key. A job can still run
+  twice (crash mid-send), so a real mail provider should deduplicate on that key.
 
 ## Deliberately left out
 
 - **Crash window between request and job.** JobRunr OSS `enqueue` does not join the Spring
-  transaction. `request()` commits the `report_request` row, then enqueues. A crash between the two
-  leaves a request with no job. In production, close this with a transactional outbox (store the
-  job intent in the same transaction and hand it off later) or with
+  transaction. `requestReport()` commits the `report_request` row, then schedules the job. A crash
+  between the two leaves a request with no job. In production, close this with a transactional
+  outbox (store the job intent in the same transaction and hand it off later) or with
   [JobRunr Pro transactions](https://www.jobrunr.io/en/documentation/pro/transactions/).
 - **Rate limiting and input validation** - no per-user limit, no `@Valid`; add them for real use.
 - **Per-type concurrency** - the 4 workers are shared by all job types. OSS has no
@@ -101,4 +103,5 @@ report/
 ```
 
 Docker is required (Testcontainers PostgreSQL, real JobRunr workers). `ReportFlowTest` covers the
-flow, an email retry after one mail failure, and share (409 before ready, one job per recipient).
+flow (report generated, owner emailed once) and an email retry after one mail failure that does
+not regenerate the report.

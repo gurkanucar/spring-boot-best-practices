@@ -1,6 +1,7 @@
 package com.gucardev.reportgenerationlighttaskwithjobrunr.report;
 
-import com.gucardev.reportgenerationlighttaskwithjobrunr.report.ReportService.*;
+import com.gucardev.reportgenerationlighttaskwithjobrunr.report.ReportService.ReportRequested;
+import com.gucardev.reportgenerationlighttaskwithjobrunr.report.ReportService.ReportView;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,23 +14,19 @@ public class ReportController {
 
     // Demo identity. In production use the authenticated principal and enforce ownership/tenant access.
     public record ReportRequestBody(String reportType, String requestedBy) {}
-    public record ShareBody(String recipientEmail) {}
 
-    private final ReportService service;
+    private final ReportService reportService;
 
+    /** Step 1: accept the request. The report and the email are produced by background jobs. */
     @PostMapping
-    public ResponseEntity<ReportRequested> request(@RequestBody ReportRequestBody body) {
-        var result = service.request(body.reportType(), body.requestedBy());
+    public ResponseEntity<ReportRequested> requestReport(@RequestBody ReportRequestBody body) {
+        var result = reportService.requestReport(body.reportType(), body.requestedBy());
         return ResponseEntity.accepted().location(URI.create(result.reportUrl())).body(result);
     }
 
+    /** Poll until {@code ready} is true. */
     @GetMapping("/{id}")
-    public ReportView get(@PathVariable Long id) {
-        return service.get(id);
-    }
-
-    @PostMapping("/{id}/share")
-    public ResponseEntity<ReportShared> share(@PathVariable Long id, @RequestBody ShareBody body) {
-        return ResponseEntity.accepted().body(service.share(id, body.recipientEmail()));
+    public ReportView getReport(@PathVariable Long id) {
+        return reportService.getReport(id);
     }
 }

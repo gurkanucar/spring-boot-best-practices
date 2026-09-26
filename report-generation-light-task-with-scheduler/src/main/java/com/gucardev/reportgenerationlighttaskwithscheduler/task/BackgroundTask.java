@@ -26,7 +26,7 @@ public class BackgroundTask {
 
     public enum Status { PENDING, RUNNING, SUCCEEDED, DEAD }
 
-    public enum Type { REPORT_GENERATION, EMAIL_SEND, REPORT_SHARE }
+    public enum Type { GENERATE_REPORT, SEND_REPORT_READY_EMAIL }
 
     @Id
     private UUID id;

@@ -1,6 +1,6 @@
 create table background_task (
     id              uuid         primary key,
-    type            varchar(50)  not null,                 -- REPORT_GENERATION, EMAIL_SEND, REPORT_SHARE
+    type            varchar(50)  not null,                 -- GENERATE_REPORT, SEND_REPORT_READY_EMAIL
     payload         jsonb        not null,                 -- ids only, never large objects
     status          varchar(20)  not null,                 -- PENDING | RUNNING | SUCCEEDED | DEAD
     attempts        integer      not null default 0,       -- executions started so far

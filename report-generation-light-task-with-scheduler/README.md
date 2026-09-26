@@ -6,7 +6,7 @@ a `background_task` table, `@Scheduled`, ShedLock and a small worker pool. Runs 
 instances.
 
 Spring Boot 4.1.1, Java 25, PostgreSQL 17, Flyway, ShedLock, Testcontainers. Report content and emails are
-demos (`ReportMailer` only logs).
+demos (`ReportEmailSender` only logs).
 
 ## Run
 
@@ -21,24 +21,24 @@ curl -i -X POST http://localhost:8099/api/reports -H "Content-Type: application/
 # 202 {"reportRequestId": 1, "taskId": "...", "reportUrl": "/api/reports/1"}
 
 curl http://localhost:8099/api/reports/1        # "ready": true once generated
-
-# share the finished report (409 while it is not ready)
-curl -X POST http://localhost:8099/api/reports/1/share -H "Content-Type: application/json" \
-  -d '{"recipientEmail": "bob@example.com"}'
 ```
 
-The schema changed (`locked_by` column removed, V1 was renamed). If you
-ran an older version, reset the database once: `docker compose down -v`.
+The migrations were edited in place. If you ran an older version, reset the database once:
+`docker compose down -v`.
 
 ## Flow
 
 ```text
-POST /api/reports ── report_request + REPORT_GENERATION task (one transaction)
-                                   │
-TaskWorker.poll (@Scheduled + ShedLock) ── claim due tasks ── worker pool
-                                   │
-ReportTasks.generate ── report + EMAIL_SEND task (one transaction) ── sendReadyEmail ── ReportMailer
-POST /api/reports/{id}/share ── REPORT_SHARE task ── ReportTasks.share ── ReportMailer
+1. POST /api/reports ── ReportService.requestReport
+                        report_request + GENERATE_REPORT task (one transaction)
+
+   TaskWorker.poll (@Scheduled + ShedLock) ── claim due tasks ── worker pool ── ReportTaskHandler.handle
+
+2. GENERATE_REPORT         ── ReportGenerator.generateReport
+                              report + SEND_REPORT_READY_EMAIL task (one transaction)
+3. SEND_REPORT_READY_EMAIL ── ReportEmailSender.sendReportReadyEmail
+
+GET /api/reports/{id} ── ReportService.getReport (poll until "ready")
 ```
 
 ## Files
@@ -46,8 +46,12 @@ POST /api/reports/{id}/share ── REPORT_SHARE task ── ReportTasks.share �
 ```text
 ReportGenerationLightTaskWithSchedulerApplication   @EnableScheduling, ShedLock lock provider,
                                                     worker thread pool
-report/  ReportController, ReportService, ReportRequest, Report, repositories,
-         ReportTasks (the task handlers), ReportMailer (demo mail adapter)
+report/  ReportController      POST /api/reports, GET /api/reports/{id}
+         ReportService         requestReport, getReport
+         ReportGenerator       step 2: generate the report, enqueue the email
+         ReportEmailSender     step 3: "report ready" email (demo, logs only)
+         ReportTaskHandler     task type -> step
+         ReportRequest, Report, repositories
 task/    BackgroundTask (entity, Status, Type), BackgroundTaskRepository (claim/finish/recover SQL),
          TaskService (enqueue), TaskWorker (poll, run, retry, recover stuck tasks)
 ```
@@ -62,8 +66,8 @@ task/    BackgroundTask (entity, Status, Type), BackgroundTaskRepository (claim/
 - **Retry with backoff** — 30s, 2m, 8m, 32m (max 1h), 5 attempts, then `DEAD` for a human to look at.
   `last_error` keeps a short error summary.
 - **Idempotent** — one report per request (unique constraint), one task per idempotency key
-  (e.g. the same report shared with the same person twice), and the mailer receives a stable
-  idempotency key for the provider.
+  (`generate-report:<id>`, `report-ready-email:<id>`), and the email sender uses a stable
+  idempotency key for the mail provider.
 - **Report and email are linked** — the report and its email task commit together.
 - **Crash recovery** — tasks `RUNNING` longer than `stuck-after` go back to `PENDING` (or `DEAD`).
   A late result from the old execution is ignored (updates match status and attempt).
@@ -85,5 +89,5 @@ and a task admin API. Add them when a real use case needs them.
 
 ## Tests
 
-`./mvnw test` (needs Docker): `ReportFlowTest` covers the full flow, a retried email and sharing
-(409 when not ready, one task and one email per recipient) against real PostgreSQL.
+`./mvnw test` (needs Docker): `ReportFlowTest` covers the full flow and a retried email against
+real PostgreSQL.
