@@ -10,15 +10,13 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ReportEmailSender {
 
-    private final ReportRequestRepository reportRequestRepository;
     private final ReportRepository reportRepository;
 
-    public void sendReportReadyEmail(Long requestId) {
-        var request = reportRequestRepository.findById(requestId).orElseThrow();
-        var report = reportRepository.findByReportRequestId(requestId).orElseThrow();
-        // Stable per request, so the provider can drop a duplicate send after a retry.
-        String idempotencyKey = "report-ready-email:" + requestId;
+    public void sendReportReadyEmail(Long reportId) {
+        var report = reportRepository.findById(reportId).orElseThrow();
+        // Stable per report, so the provider can drop a duplicate send after a retry.
+        String idempotencyKey = "report-ready-email:" + reportId;
         log.info("DEMO: report {} would be emailed to {} (idempotency key {})",
-                report.getId(), request.getRequestedBy(), idempotencyKey);
+                reportId, report.getRequestedBy(), idempotencyKey);
     }
 }

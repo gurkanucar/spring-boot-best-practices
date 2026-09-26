@@ -1,15 +1,10 @@
-create table report_request (
+-- One row per report: created PENDING by the API, set to READY by the generate job.
+create table report (
     id bigint generated always as identity primary key,
     report_type varchar(50) not null,
     requested_by varchar(254) not null,
-    created_at timestamptz not null
-);
-
--- One report per request: the unique constraint backs up concurrent generate executions.
-create table report (
-    id uuid primary key,
-    report_request_id bigint not null references report_request(id),
-    content text not null,
-    generated_at timestamptz not null,
-    constraint uk_report_request unique (report_request_id)
+    status varchar(20) not null,
+    content text,
+    requested_at timestamptz not null,
+    generated_at timestamptz
 );

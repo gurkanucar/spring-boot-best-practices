@@ -27,12 +27,13 @@ class ReportFlowTest extends IntegrationTestBase {
 
     @Test
     void reportIsGeneratedAndTheOwnerIsEmailedOnce() throws Exception {
-        long id = requestReport();
+        long reportId = requestReport();
 
-        await().atMost(TIMEOUT).until(() -> getReport(id).get("ready").asBoolean());
-        awaitTaskSucceeded("generate-report:" + id);
-        awaitTaskSucceeded("report-ready-email:" + id);
-        verify(reportEmailSender, times(1)).sendReportReadyEmail(id);
+        await().atMost(TIMEOUT).until(() -> "READY".equals(getReport(reportId).get("status").asString()));
+        assertThat(getReport(reportId).get("content").asString()).isEqualTo("MONTHLY_SALES report for " + OWNER);
+        awaitTaskSucceeded("generate-report:" + reportId);
+        awaitTaskSucceeded("report-ready-email:" + reportId);
+        verify(reportEmailSender, times(1)).sendReportReadyEmail(reportId);
     }
 
     @Test
@@ -40,14 +41,14 @@ class ReportFlowTest extends IntegrationTestBase {
         doThrow(new IllegalStateException("SMTP down")).doNothing()
                 .when(reportEmailSender).sendReportReadyEmail(anyLong());
 
-        long id = requestReport();
+        long reportId = requestReport();
 
-        Map<String, Object> email = awaitTaskSucceeded("report-ready-email:" + id);
+        Map<String, Object> email = awaitTaskSucceeded("report-ready-email:" + reportId);
         assertThat(email.get("attempts")).isEqualTo(2);
         assertThat((String) email.get("last_error")).contains("SMTP down");
-        verify(reportEmailSender, times(2)).sendReportReadyEmail(id);
-        assertThat(jdbc.sql("select count(*) from report where report_request_id = :id")
-                .param("id", id).query(Long.class).single()).isEqualTo(1);
+        verify(reportEmailSender, times(2)).sendReportReadyEmail(reportId);
+        assertThat(jdbc.sql("select count(*) from background_task where type = 'SEND_REPORT_READY_EMAIL'")
+                .query(Long.class).single()).isEqualTo(1);
     }
 
     private long requestReport() throws Exception {
@@ -55,11 +56,11 @@ class ReportFlowTest extends IntegrationTestBase {
                         .content("""
                                 {"reportType": "MONTHLY_SALES", "requestedBy": "%s"}""".formatted(OWNER)))
                 .andExpect(status().isAccepted());
-        return json(result).get("reportRequestId").asLong();
+        return json(result).get("reportId").asLong();
     }
 
-    private JsonNode getReport(long id) throws Exception {
-        return json(mockMvc.perform(get("/api/reports/" + id)).andExpect(status().isOk()));
+    private JsonNode getReport(long reportId) throws Exception {
+        return json(mockMvc.perform(get("/api/reports/" + reportId)).andExpect(status().isOk()));
     }
 
     private Map<String, Object> awaitTaskSucceeded(String idempotencyKey) {

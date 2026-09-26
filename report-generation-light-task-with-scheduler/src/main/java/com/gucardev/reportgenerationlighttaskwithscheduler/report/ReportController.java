@@ -30,8 +30,8 @@ public class ReportController {
         return ResponseEntity.accepted().location(URI.create(requested.reportUrl())).body(requested);
     }
 
-    @GetMapping("/{id}")
-    public ReportView getReport(@PathVariable Long id) {
-        return reportService.getReport(id);
+    @GetMapping("/{reportId}")
+    public ReportView getReport(@PathVariable Long reportId) {
+        return reportService.getReport(reportId);
     }
 }

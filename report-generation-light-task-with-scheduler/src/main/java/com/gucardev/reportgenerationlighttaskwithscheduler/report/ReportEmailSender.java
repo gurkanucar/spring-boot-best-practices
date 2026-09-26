@@ -13,14 +13,12 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ReportEmailSender {
 
-    private final ReportRequestRepository reportRequestRepository;
     private final ReportRepository reportRepository;
 
-    public void sendReportReadyEmail(Long requestId) {
-        ReportRequest request = reportRequestRepository.findById(requestId).orElseThrow();
-        Report report = reportRepository.findByReportRequestId(requestId).orElseThrow();
-        String idempotencyKey = "report-ready-email:" + requestId;
+    public void sendReportReadyEmail(Long reportId) {
+        Report report = reportRepository.findById(reportId).orElseThrow();
+        String idempotencyKey = "report-ready-email:" + reportId;
         log.info("DEMO: email to {}: report {} is ready (idempotency key {})",
-                request.getRequestedBy(), report.getId(), idempotencyKey);
+                report.getRequestedBy(), reportId, idempotencyKey);
     }
 }

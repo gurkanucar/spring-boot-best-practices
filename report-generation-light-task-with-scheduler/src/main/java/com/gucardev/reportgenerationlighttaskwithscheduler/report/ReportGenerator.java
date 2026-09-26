@@ -13,29 +13,30 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Slf4j
 public class ReportGenerator {
 
-    private final ReportRequestRepository reportRequestRepository;
     private final ReportRepository reportRepository;
     private final TaskService taskService;
     private final TransactionTemplate transactionTemplate;
 
-    /** Idempotent: a retried task finds the existing report and does nothing. */
-    public void generateReport(Long requestId) {
-        if (reportRepository.existsByReportRequestId(requestId)) {
+    /** Idempotent: a retried task finds the report READY and does nothing. */
+    public void generateReport(Long reportId) {
+        Report report = reportRepository.findById(reportId).orElseThrow();
+        if (report.getStatus() == Report.Status.READY) {
             return;
         }
-        ReportRequest request = reportRequestRepository.findById(requestId).orElseThrow();
-        log.info("Generating {} report for request {}", request.getReportType(), requestId);
+        log.info("Generating {} report {}", report.getReportType(), reportId);
         // Demo content. Real rendering (PDF/CSV, upload) also stays outside the transaction.
-        String content = "%s report for %s".formatted(request.getReportType(), request.getRequestedBy());
+        String content = "%s report for %s".formatted(report.getReportType(), report.getRequestedBy());
 
-        // The report and its email task commit together.
+        // READY and the email task commit together; the status is re-checked on a fresh load, and
+        // the email's idempotency key stops a duplicate email if two runs ever race past it.
         transactionTemplate.executeWithoutResult(status -> {
-            if (reportRepository.existsByReportRequestId(requestId)) {
+            Report current = reportRepository.findById(reportId).orElseThrow();
+            if (current.getStatus() == Report.Status.READY) {
                 return;
             }
-            reportRepository.save(Report.generated(requestId, content));
-            taskService.enqueue(BackgroundTask.Type.SEND_REPORT_READY_EMAIL, requestId,
-                    "report-ready-email:" + requestId);
+            current.markReady(content);
+            taskService.enqueue(BackgroundTask.Type.SEND_REPORT_READY_EMAIL, reportId,
+                    "report-ready-email:" + reportId);
         });
     }
 }

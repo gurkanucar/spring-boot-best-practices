@@ -18,27 +18,30 @@ docker compose up -d
 ```bash
 curl -i -X POST http://localhost:8099/api/reports -H "Content-Type: application/json" \
   -d '{"reportType": "CUSTOMER_LIST", "requestedBy": "alice@example.com"}'
-# 202 {"reportRequestId": 1, "taskId": "...", "reportUrl": "/api/reports/1"}
+# 202 {"reportId": 1, "taskId": "...", "reportUrl": "/api/reports/1"}
 
-curl http://localhost:8099/api/reports/1        # "ready": true once generated
+curl http://localhost:8099/api/reports/1
+# {"reportId": 1, "reportType": "CUSTOMER_LIST", "requestedBy": "alice@example.com",
+#  "status": "PENDING", "requestedAt": "...", "generatedAt": null, "content": null}
+# ... later "status": "READY" with generatedAt and content
 ```
 
-The migrations were edited in place. If you ran an older version, reset the database once:
-`docker compose down -v`.
+The migrations were edited in place and the schema changed (one `report` table). If you ran an
+older version, reset the database once: `docker compose down -v`.
 
 ## Flow
 
 ```text
 1. POST /api/reports ── ReportService.requestReport
-                        report_request + GENERATE_REPORT task (one transaction)
+                        report (PENDING) + GENERATE_REPORT task (one transaction)
 
    TaskWorker.poll (@Scheduled + ShedLock) ── claim due tasks ── worker pool ── ReportTaskHandler.handle
 
 2. GENERATE_REPORT         ── ReportGenerator.generateReport
-                              report + SEND_REPORT_READY_EMAIL task (one transaction)
+                              report READY + SEND_REPORT_READY_EMAIL task (one transaction)
 3. SEND_REPORT_READY_EMAIL ── ReportEmailSender.sendReportReadyEmail
 
-GET /api/reports/{id} ── ReportService.getReport (poll until "ready")
+GET /api/reports/{reportId} ── ReportService.getReport (poll until "status": "READY")
 ```
 
 ## Files
@@ -46,15 +49,21 @@ GET /api/reports/{id} ── ReportService.getReport (poll until "ready")
 ```text
 ReportGenerationLightTaskWithSchedulerApplication   @EnableScheduling, ShedLock lock provider,
                                                     worker thread pool
-report/  ReportController      POST /api/reports, GET /api/reports/{id}
+report/  ReportController      POST /api/reports, GET /api/reports/{reportId}
          ReportService         requestReport, getReport
          ReportGenerator       step 2: generate the report, enqueue the email
          ReportEmailSender     step 3: "report ready" email (demo, logs only)
          ReportTaskHandler     task type -> step
-         ReportRequest, Report, repositories
+         Report (entity, Status PENDING/READY), ReportRepository
 task/    BackgroundTask (entity, Status, Type), BackgroundTaskRepository (claim/finish/recover SQL),
          TaskService (enqueue), TaskWorker (poll, run, retry, recover stuck tasks)
 ```
+
+## Data
+
+One table, `report`: `id`, `report_type`, `requested_by`, `status` (`PENDING` → `READY`),
+`content` and `generated_at` (null until READY), `requested_at`. The `id` is the `reportId` in the
+API, in task payloads and in idempotency keys. Tasks live in `background_task`, ShedLock in `shedlock`.
 
 ## Guarantees
 
@@ -65,10 +74,11 @@ task/    BackgroundTask (entity, Status, Type), BackgroundTaskRepository (claim/
   `FOR UPDATE SKIP LOCKED` as a second guard, so a row is never claimed twice even if two polls overlap.
 - **Retry with backoff** — 30s, 2m, 8m, 32m (max 1h), 5 attempts, then `DEAD` for a human to look at.
   `last_error` keeps a short error summary.
-- **Idempotent** — one report per request (unique constraint), one task per idempotency key
-  (`generate-report:<id>`, `report-ready-email:<id>`), and the email sender uses a stable
-  idempotency key for the mail provider.
-- **Report and email are linked** — the report and its email task commit together.
+- **Idempotent** — a report row goes PENDING to READY once (a retried generation finds it READY
+  and does nothing), one task per idempotency key (`generate-report:<reportId>`,
+  `report-ready-email:<reportId>`), and the email sender uses a stable idempotency key for the
+  mail provider.
+- **Report and email are linked** — marking the report READY and its email task commit together.
 - **Crash recovery** — tasks `RUNNING` longer than `stuck-after` go back to `PENDING` (or `DEAD`).
   A late result from the old execution is ignored (updates match status and attempt).
 

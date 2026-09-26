@@ -7,6 +7,7 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.gucardev.reportgenerationlighttaskwithjobrunr.report.Report;
 import com.gucardev.reportgenerationlighttaskwithjobrunr.report.ReportEmailSender;
 import com.gucardev.reportgenerationlighttaskwithjobrunr.report.ReportRepository;
 import java.nio.charset.StandardCharsets;
@@ -60,7 +61,12 @@ class ReportFlowTest {
 
         awaitSucceeded(reportReadyEmailJobId(id));
         verify(emailSender, times(2)).sendReportReadyEmail(id);
-        assertThat(reports.findAll()).filteredOn(r -> r.getReportRequestId() == id).hasSize(1);
+        awaitSucceeded(generateReportJobId(id));
+        var report = reports.findById(id).orElseThrow();
+        assertThat(report.getStatus()).isEqualTo(Report.Status.READY);
+        // The generate job ran once, so the report was marked ready exactly once.
+        assertThat(storage.getJobById(generateReportJobId(id)).getJobStates())
+                .filteredOn(state -> state.getName() == StateName.PROCESSING).hasSize(1);
     }
 
     private long requestReport(String owner) throws Exception {
@@ -69,17 +75,25 @@ class ReportFlowTest {
                                 {"reportType":"MONTHLY_SALES","requestedBy":"%s"}""".formatted(owner)))
                 .andExpect(status().isAccepted())
                 .andReturn().getResponse().getContentAsString();
-        return json.readTree(response).get("reportRequestId").asLong();
+        return json.readTree(response).get("reportId").asLong();
     }
 
-    /** Mirrors ReportJobScheduler's fixed id for the email job. */
-    private static UUID reportReadyEmailJobId(long requestId) {
-        return UUID.nameUUIDFromBytes(("report-ready-email:" + requestId).getBytes(StandardCharsets.UTF_8));
+    /** Mirror ReportJobScheduler's fixed job ids. */
+    private static UUID generateReportJobId(long reportId) {
+        return jobId("generate-report:" + reportId);
+    }
+
+    private static UUID reportReadyEmailJobId(long reportId) {
+        return jobId("report-ready-email:" + reportId);
+    }
+
+    private static UUID jobId(String key) {
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
     }
 
     private void awaitReady(long id) {
         await().atMost(TIMEOUT).untilAsserted(() ->
-                mvc.perform(get("/api/reports/" + id)).andExpect(jsonPath("$.ready").value(true)));
+                mvc.perform(get("/api/reports/" + id)).andExpect(jsonPath("$.status").value("READY")));
     }
 
     private void awaitSucceeded(UUID jobId) {

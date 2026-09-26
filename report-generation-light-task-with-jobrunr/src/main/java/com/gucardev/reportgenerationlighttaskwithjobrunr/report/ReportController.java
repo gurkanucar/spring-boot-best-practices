@@ -24,9 +24,9 @@ public class ReportController {
         return ResponseEntity.accepted().location(URI.create(result.reportUrl())).body(result);
     }
 
-    /** Poll until {@code ready} is true. */
-    @GetMapping("/{id}")
-    public ReportView getReport(@PathVariable Long id) {
-        return reportService.getReport(id);
+    /** Poll until {@code status} is READY. */
+    @GetMapping("/{reportId}")
+    public ReportView getReport(@PathVariable Long reportId) {
+        return reportService.getReport(reportId);
     }
 }

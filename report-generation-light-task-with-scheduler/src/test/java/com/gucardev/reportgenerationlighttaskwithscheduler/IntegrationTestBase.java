@@ -34,6 +34,5 @@ public abstract class IntegrationTestBase {
                 .query(Long.class).single() == 0);
         jdbc.sql("delete from background_task").update();
         jdbc.sql("delete from report").update();
-        jdbc.sql("delete from report_request").update();
     }
 }

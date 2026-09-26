@@ -3,7 +3,6 @@ package com.gucardev.reportgenerationlighttaskwithscheduler.report;
 import com.gucardev.reportgenerationlighttaskwithscheduler.task.BackgroundTask;
 import com.gucardev.reportgenerationlighttaskwithscheduler.task.TaskService;
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -15,34 +14,32 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class ReportService {
 
-    public record ReportRequested(Long reportRequestId, UUID taskId, String reportUrl) {
+    public record ReportRequested(Long reportId, UUID taskId, String reportUrl) {
     }
 
-    public record ReportView(Long reportRequestId, String reportType, String requestedBy, Instant requestedAt,
-                             boolean ready, Instant generatedAt, String content) {
+    public record ReportView(Long reportId, String reportType, String requestedBy, Report.Status status,
+                             Instant requestedAt, Instant generatedAt, String content) {
     }
 
-    private final ReportRequestRepository reportRequestRepository;
     private final ReportRepository reportRepository;
     private final TaskService taskService;
 
-    /** Saves the request and enqueues GENERATE_REPORT in one transaction. */
+    /** Saves a PENDING report and enqueues GENERATE_REPORT in one transaction. */
     @Transactional
     public ReportRequested requestReport(String reportType, String requestedBy) {
-        ReportRequest request = reportRequestRepository.save(ReportRequest.create(reportType, requestedBy));
-        UUID taskId = taskService.enqueue(BackgroundTask.Type.GENERATE_REPORT, request.getId(),
-                "generate-report:" + request.getId());
-        return new ReportRequested(request.getId(), taskId, "/api/reports/" + request.getId());
+        Report report = reportRepository.save(Report.requested(reportType, requestedBy));
+        Long reportId = report.getId();
+        UUID taskId = taskService.enqueue(BackgroundTask.Type.GENERATE_REPORT, reportId,
+                "generate-report:" + reportId);
+        return new ReportRequested(reportId, taskId, "/api/reports/" + reportId);
     }
 
     @Transactional(readOnly = true)
-    public ReportView getReport(Long reportRequestId) {
-        ReportRequest request = reportRequestRepository.findById(reportRequestId)
+    public ReportView getReport(Long reportId) {
+        Report report = reportRepository.findById(reportId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
-                        "Report request " + reportRequestId + " not found"));
-        Optional<Report> report = reportRepository.findByReportRequestId(reportRequestId);
-        return new ReportView(request.getId(), request.getReportType(), request.getRequestedBy(),
-                request.getCreatedAt(), report.isPresent(), report.map(Report::getGeneratedAt).orElse(null),
-                report.map(Report::getContent).orElse(null));
+                        "Report " + reportId + " not found"));
+        return new ReportView(report.getId(), report.getReportType(), report.getRequestedBy(),
+                report.getStatus(), report.getRequestedAt(), report.getGeneratedAt(), report.getContent());
     }
 }

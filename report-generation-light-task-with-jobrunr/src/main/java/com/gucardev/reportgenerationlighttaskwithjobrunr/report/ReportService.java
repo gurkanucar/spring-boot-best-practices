@@ -12,28 +12,25 @@ import org.springframework.web.server.ResponseStatusException;
 @RequiredArgsConstructor
 public class ReportService {
 
-    public record ReportRequested(Long reportRequestId, UUID jobId, String reportUrl) {}
-    public record ReportView(Long reportRequestId, String reportType, String requestedBy, Instant requestedAt,
-                             boolean ready, Instant generatedAt, String content) {}
+    public record ReportRequested(Long reportId, UUID jobId, String reportUrl) {}
+    public record ReportView(Long reportId, String reportType, String requestedBy, Report.Status status,
+                             Instant requestedAt, Instant generatedAt, String content) {}
 
-    private final ReportRequestRepository reportRequestRepository;
     private final ReportRepository reportRepository;
     private final ReportJobScheduler reportJobScheduler;
 
     public ReportRequested requestReport(String reportType, String requestedBy) {
-        Long requestId = reportRequestRepository.save(ReportRequest.create(reportType, requestedBy)).getId();
-        // The request row is committed here. JobRunr OSS enqueue does not join a Spring transaction,
-        // so a crash between these two lines leaves a request without a job (see README).
-        UUID jobId = reportJobScheduler.scheduleReportGeneration(requestId);
-        return new ReportRequested(requestId, jobId, "/api/reports/" + requestId);
+        Long reportId = reportRepository.save(Report.requested(reportType, requestedBy)).getId();
+        // The PENDING report row is committed here. JobRunr OSS enqueue does not join a Spring transaction,
+        // so a crash between these two lines leaves a PENDING report without a job (see README).
+        UUID jobId = reportJobScheduler.scheduleReportGeneration(reportId);
+        return new ReportRequested(reportId, jobId, "/api/reports/" + reportId);
     }
 
-    public ReportView getReport(Long requestId) {
-        var request = reportRequestRepository.findById(requestId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Report request not found"));
-        var report = reportRepository.findByReportRequestId(requestId);
-        return new ReportView(requestId, request.getReportType(), request.getRequestedBy(), request.getCreatedAt(),
-                report.isPresent(), report.map(Report::getGeneratedAt).orElse(null),
-                report.map(Report::getContent).orElse(null));
+    public ReportView getReport(Long reportId) {
+        var report = reportRepository.findById(reportId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Report not found"));
+        return new ReportView(report.getId(), report.getReportType(), report.getRequestedBy(), report.getStatus(),
+                report.getRequestedAt(), report.getGeneratedAt(), report.getContent());
     }
 }
