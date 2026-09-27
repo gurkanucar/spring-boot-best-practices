@@ -1,0 +1,45 @@
+spring:
+  application:
+    name: logto-basic-security
+  config:
+    # LOGTO_CLIENT_ID and LOGTO_CLIENT_SECRET from a local, git-ignored .env (see .env.example).
+    # Environment variables with the same names work too.
+    import: optional:file:.env[.properties]
+  datasource:
+    # docker-compose.yml: the "app" database, not Logto's.
+    url: jdbc:postgresql://localhost:5436/app
+    username: app
+    password: app
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Demo only: creates the app_user table. Use Flyway or Liquibase in a real application.
+      ddl-auto: update
+  security:
+    oauth2:
+      client:
+        registration:
+          # The registration id "logto" is part of the redirect URI: /login/oauth2/code/logto
+          logto:
+            client-name: Logto
+            client-id: ${LOGTO_CLIENT_ID}
+            client-secret: ${LOGTO_CLIENT_SECRET}
+            # roles: the user's Logto roles in the "roles" claim (-> ROLE_* authorities).
+            scope:
+              - openid
+              - profile
+              - email
+              - roles
+        provider:
+          logto:
+            # Endpoints and keys are read from <issuer-uri>/.well-known/openid-configuration at
+            # startup, so Logto must be running before the application starts.
+            issuer-uri: http://localhost:3001/oidc
+
+app:
+  logto:
+    # Signs Logto's webhook requests (Webhooks -> your webhook -> Signing key). Empty: webhooks rejected.
+    webhook-signing-key: ${LOGTO_WEBHOOK_SIGNING_KEY:}
+
+server:
+  port: 8101

@@ -1,0 +1,53 @@
+# Logto (identity provider) and PostgreSQL for local development. Not a production setup.
+#
+#   Logto OIDC endpoint : http://localhost:3001   (issuer: http://localhost:3001/oidc)
+#   Logto admin console : http://localhost:3002
+#   PostgreSQL          : localhost:5436          (databases: logto, app)
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      # 5436 on the host, so it does not clash with other PostgreSQL instances in this repository.
+      - "127.0.0.1:5436:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Runs once, on an empty volume: creates the Spring Boot application's own user and database.
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  logto:
+    image: svhd/logto:1.43.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Creates and seeds the "logto" database on the first start; --swe skips it when it already exists.
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    environment:
+      TRUST_PROXY_HEADER: 1
+      # Logto needs the superuser: its seed creates PostgreSQL roles for its tenants.
+      DB_URL: postgres://postgres:postgres@postgres:5432/logto
+      # The URLs browsers and the Spring Boot app use. ENDPOINT + /oidc becomes the issuer in every
+      # token, so it must be the same address the app reaches Logto at.
+      ENDPOINT: http://localhost:3001
+      ADMIN_ENDPOINT: http://localhost:3002
+      # Webhooks go to the app on the host: http://host.docker.internal:8101/webhooks/logto.
+      # Logto refuses outgoing requests to private addresses (SSRF protection) unless allowed here:
+      # IPs or CIDR ranges, comma-separated, no host names. host.docker.internal is 192.168.65.254 on
+      # Docker Desktop and the docker0 gateway, usually 172.17.0.1, on Linux.
+      SSRF_ALLOWED_ADDRESSES: 192.168.65.254,172.17.0.1
+    extra_hosts:
+      # Docker Desktop defines host.docker.internal itself; this adds it on Linux.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+
+volumes:
+  postgres-data:
