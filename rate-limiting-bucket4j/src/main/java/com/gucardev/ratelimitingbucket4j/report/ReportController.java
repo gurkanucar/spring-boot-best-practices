@@ -1,5 +1,6 @@
 package com.gucardev.ratelimitingbucket4j.report;
 
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -23,6 +24,14 @@ public class ReportController {
     /** Also passes the {@code RateLimitFilter} (1 token), like every other {@code /api/**} request. */
     @PostMapping("/api/reports/monthly")
     public Map<String, Object> monthly(@RequestHeader(EMAIL_HEADER) String email) {
-        return reportService.generateMonthly(email);
+        return reportService.generateMonthly(normalize(email));
+    }
+
+    /**
+     * One spelling per address, or every spelling would get its own bucket. {@code Locale.ROOT}: with
+     * a Turkish default locale {@code "ALICE".toLowerCase()} is {@code "alıce"}.
+     */
+    static String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

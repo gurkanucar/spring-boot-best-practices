@@ -200,12 +200,16 @@ app:
 ```
 
 ```java
-public Map<String, Object> generateMonthly(String email) {
-    String normalized = email.trim().toLowerCase(Locale.ROOT);  // else "Alice@x.com" is a new bucket
-    rateLimiter.consume("report-per-email", normalized);       // RateLimitExceededException -> 429
-    ...
-}
+@RateLimited(limit = "report-per-email", key = "#email")      // RateLimitExceededException -> 429
+public Map<String, Object> generateMonthly(String email) { ... }
+
+rateLimiter.consume("report-per-email", email);              // the same, without the annotation
 ```
+
+- `@RateLimited` is a Spring AOP proxy (`RateLimitedAspect`, `spring-boot-starter-aspectj`): it only
+  works on public methods called from another bean. `key` is SpEL over the parameters.
+- The key must be normalised **before** the call (`ReportController.normalize`: trim, lower case with
+  `Locale.ROOT`), or `Alice@x.com` and `alice@x.com` would be two buckets.
 
 - `RateLimitExceptionHandler` turns the exception into the same 429 as the filter (`Retry-After`,
   `RateLimit-*`, problem details).
@@ -220,6 +224,47 @@ public Map<String, Object> generateMonthly(String email) {
 for i in 1 2 3 4; do curl -s -o /dev/null -w "%{http_code} " -X POST -H "X-API-Key: demo-pro-key"   -H "X-User-Email: alice@example.com" $B/api/reports/monthly; done
 #   200 200 200 429   <- Retry-After: 1200 (one token every 20 minutes)
 ```
+
+## Do you need all this? The simple way and the alternatives
+
+Most of this project is here to **show** things: trusting `X-Forwarded-For` safely, anonymous
+browsers, per-IP ceilings, shared networks, in-memory vs Redis, fail open, `RateLimit-*` headers.
+A single rule like "3 reports per hour per e-mail" needs none of it. On one instance this is
+enough, no extra beans:
+
+```java
+@Service
+class ReportService {
+
+    private final Cache<String, Bucket> buckets = Caffeine.newBuilder()
+            .expireAfterAccess(Duration.ofHours(1))   // at least the period, or a user gets a fresh bucket
+            .build();
+
+    Map<String, Object> generateMonthly(String email) {
+        Bucket bucket = buckets.get(email, key -> Bucket.builder()
+                .addLimit(limit -> limit.capacity(3).refillGreedy(3, Duration.ofHours(1)))
+                .build());
+        if (!bucket.tryConsume(1)) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS);
+        }
+        ...
+    }
+}
+```
+
+With several instances, replace the `Cache` with Bucket4j's Redis `ProxyManager`
+(see `RedisRateLimitStore`): a few more lines.
+
+| Option | When | Note |
+|---|---|---|
+| The snippet above | One rule, one place | No `Retry-After` / `RateLimit-*` headers unless you add them. |
+| `RateLimiter` / `@RateLimited` (this project) | The same kind of rule in several places | Config in YAML, same store and 429 answer as the filter. |
+| [`bucket4j-spring-boot-starter`](https://github.com/MarcGiffing/bucket4j-spring-boot-starter) | **Least code**: limits per URL in YAML, key in SpEL (`cache-key: getHeader('X-User-Email')`), an annotation for methods | The latest release (0.12.10, June 2025) is for Spring Boot 3. Its master branch has moved to Boot 4, but no release yet, so this Boot 4 project cannot use it. |
+| Resilience4j `@RateLimiter` | One global limit for all callers, e.g. protecting a provider | No key: it cannot limit per e-mail or per user. |
+| API gateway (Spring Cloud Gateway `RequestRateLimiter`, nginx `limit_req`, Kong, a cloud gateway) | Limits by IP, API key or header without code in the app | Rules that need the application's knowledge (report generation) usually stay in the app. |
+
+A sensible split: general limits (IP, API key) at the gateway, rules tied to business operations
+in the application.
 
 ## Where the buckets live
 
@@ -270,6 +315,7 @@ ratelimit/
   RateLimitFilter        charges /api/** requests, 429 + Retry-After, RateLimit-* headers, fail open
   RateLimitPolicy        which buckets a request belongs to (API key / anon cookie / IP), its cost
   RateLimiter            named limits charged from code; RateLimitExceededException -> 429
+  RateLimited            the same as an annotation (RateLimitedAspect), key in SpEL
   ClientIpResolver       real client IP from X-Forwarded-For, only through trusted proxies
   CidrRange, RateLimitBucket, RateLimitProperties, RateLimitConfig
 ratelimit/store/
@@ -280,7 +326,7 @@ demo/
   DemoController         /api/whoami, /api/products (1 token), /api/reports/export (5 tokens)
 report/
   ReportController       POST /api/reports/monthly, e-mail from X-User-Email
-  ReportService          3 reports per hour per e-mail (RateLimiter)
+  ReportService          3 reports per hour per e-mail (@RateLimited)
 ```
 
 ## Tests

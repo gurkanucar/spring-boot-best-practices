@@ -22,6 +22,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
+        <!-- @RateLimited on service methods (RateLimitedAspect). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
+        </dependency>
         <!-- Lettuce client; only connected when app.rate-limit.store=redis. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

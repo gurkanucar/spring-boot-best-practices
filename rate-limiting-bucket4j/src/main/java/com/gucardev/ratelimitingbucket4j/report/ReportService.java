@@ -1,34 +1,25 @@
 package com.gucardev.ratelimitingbucket4j.report;
 
-import com.gucardev.ratelimitingbucket4j.ratelimit.RateLimiter;
-import java.util.Locale;
+import com.gucardev.ratelimitingbucket4j.ratelimit.RateLimited;
 import java.util.Map;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 /**
  * Report generation is expensive, so each e-mail address may request only a few reports per hour
  * ({@code app.rate-limit.limits.report-per-email}), whatever IP, browser or API key it comes from.
  *
- * <p>The check is here, not in the controller: the rule belongs to "generating a report", so it
- * also holds when a report is requested from somewhere else (a scheduled job, a message listener).
+ * <p>The limit is on the service, not the controller: the rule belongs to "generating a report", so
+ * it also holds when a report is requested from somewhere else (a scheduled job, a message listener).
  */
 @Service
 public class ReportService {
 
-    static final String LIMIT = "report-per-email";
-
-    /** Absent when {@code app.rate-limit.enabled=false}. */
-    private final ObjectProvider<RateLimiter> rateLimiter;
-
-    public ReportService(ObjectProvider<RateLimiter> rateLimiter) {
-        this.rateLimiter = rateLimiter;
-    }
-
+    /**
+     * @param email already normalised ({@link ReportController#normalize}): the limit is charged before
+     *              this method runs, so "Alice@x.com" and "alice@x.com" must arrive as the same key
+     */
+    @RateLimited(limit = "report-per-email", key = "#email")
     public Map<String, Object> generateMonthly(String email) {
-        // Normalised, or "Alice@x.com" and "alice@x.com " would be two buckets for the same person.
-        String normalized = email.trim().toLowerCase(Locale.ROOT);
-        rateLimiter.ifAvailable(limiter -> limiter.consume(LIMIT, normalized));
-        return Map.of("status", "report queued", "email", normalized);
+        return Map.of("status", "report queued", "email", email);
     }
 }

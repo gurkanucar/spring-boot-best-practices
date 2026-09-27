@@ -54,6 +54,11 @@ class RateLimitConfig {
         return new RateLimiter(properties.limits(), store);
     }
 
+    @Bean
+    RateLimitedAspect rateLimitedAspect(RateLimiter rateLimiter) {
+        return new RateLimitedAspect(rateLimiter);
+    }
+
     /** Only our API is limited; actuator and static content are not. */
     @Bean
     FilterRegistrationBean<RateLimitFilter> rateLimitFilter(RateLimitPolicy policy, RateLimitStore store, JsonMapper jsonMapper) {
