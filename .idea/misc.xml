@@ -27,6 +27,7 @@
         <option value="$PROJECT_DIR$/file-operations-io/pom.xml" />
         <option value="$PROJECT_DIR$/file-operations-s3/pom.xml" />
         <option value="$PROJECT_DIR$/java-email-sending/pom.xml" />
+        <option value="$PROJECT_DIR$/rate-limiting-bucket4j/pom.xml" />
       </list>
     </option>
   </component>
