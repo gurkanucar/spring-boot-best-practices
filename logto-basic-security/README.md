@@ -19,8 +19,8 @@ cp .env.example .env        # LOGTO_CLIENT_ID, LOGTO_CLIENT_SECRET, LOGTO_WEBHOO
 
 | | URL |
 |---|---|
-| Logto OIDC endpoint | http://localhost:3001 (issuer `http://localhost:3001/oidc`) |
-| Logto admin console | http://localhost:3002 |
+| Logto admin console | http://localhost:3002: **open this one** to set Logto up |
+| Logto OIDC endpoint | `http://localhost:3001` (issuer `http://localhost:3001/oidc`): for the app, not a page to open. Opened directly it shows "Session not found" (`/unknown-session`): its sign-in page only works when an application sends the user there |
 | PostgreSQL | `localhost:5436`, database `app` (user `app` / `app`) for the application, `logto` for Logto |
 | This app | http://localhost:8101 |
 
@@ -32,12 +32,30 @@ seed creates roles) and the application's `app` (`docker/postgres/init.sql`, its
 
 1. Open http://localhost:3002 and create the admin account.
 2. **Applications → Create application → Traditional web** (a server-side app that can keep a
-   client secret), e.g. named `spring-boot`.
-3. In the application:
+   client secret), e.g. named `spring-boot`. Picking the **Java Spring Boot** framework creates the
+   same type of application.
+3. In the application (both lists start empty):
    - **Redirect URI**: `http://localhost:8101/login/oauth2/code/logto`
      (Spring Security's `/login/oauth2/code/{registrationId}`, registration id `logto`)
    - **Post sign-out redirect URI**: `http://localhost:8101/`
-   - Save, then copy **App ID** and **App secret** into `.env`.
+   - Save, then copy **App ID** and **App secret** into `.env`:
+
+     ```properties
+     LOGTO_CLIENT_ID=<App ID>
+     LOGTO_CLIENT_SECRET=<App secret>
+     ```
+
+   Logto's Spring Boot guide, shown after creating the application, assumes port 8080 and
+   suggests the callback URL as the post sign-out URI: use the values above instead. Its code is
+   already in this project in an up-to-date form; do not copy it:
+
+   | The guide | This project |
+   |---|---|
+   | `authorizeRequests`, `antMatchers` | removed in Spring Security 7: `authorizeHttpRequests`, `requestMatchers` |
+   | a logout handler that only ends the app's session | `OidcClientInitiatedLogoutSuccessHandler`: ends Logto's session too, else the next sign-in asks for no password |
+   | `authorization-uri`, `jwk-set-uri` next to `issuer-uri` | `issuer-uri` alone: the rest comes from Logto's discovery document |
+   | `offline_access` scope (refresh token) | not needed for a session sign-in; `roles` instead, for the role checks |
+   | the ES384 `idTokenDecoderFactory` | the same, in `SecurityConfig` |
 4. Optional, for the role pages: **Authorization → Roles → Create role** `admin` and `user` (type:
    user role), then **User management → a user → Roles → Assign**.
 5. Optional, to keep `app_user` in sync: **Webhooks → Create webhook**

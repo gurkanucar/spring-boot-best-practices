@@ -4,7 +4,11 @@ spring:
   config:
     # LOGTO_CLIENT_ID and LOGTO_CLIENT_SECRET from a local, git-ignored .env (see .env.example).
     # Environment variables with the same names work too.
-    import: optional:file:.env[.properties]
+    # Relative paths are resolved from the working directory: the module with ./mvnw, but the
+    # repository root with an IntelliJ run configuration that does not set one.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:logto-basic-security/.env[.properties]
   datasource:
     # docker-compose.yml: the "app" database, not Logto's.
     url: jdbc:postgresql://localhost:5436/app
