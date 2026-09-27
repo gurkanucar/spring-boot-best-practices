@@ -45,3 +45,6 @@ app:
     # capacity of every caller who may use the endpoint, or that caller can never call it.
     costs:
       "[/api/reports/export]": 5
+    # Named limits charged from code (RateLimiter), for rules the filter cannot see.
+    limits:
+      report-per-email: [ { capacity: 3, period: 1h } ]   # ReportService: 3 reports per hour per e-mail

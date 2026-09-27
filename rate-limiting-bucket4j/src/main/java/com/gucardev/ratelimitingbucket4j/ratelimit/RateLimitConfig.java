@@ -49,6 +49,11 @@ class RateLimitConfig {
         return new RedisRateLimitStore(rateLimitRedisConnection);
     }
 
+    @Bean
+    RateLimiter rateLimiter(RateLimitProperties properties, RateLimitStore store) {
+        return new RateLimiter(properties.limits(), store);
+    }
+
     /** Only our API is limited; actuator and static content are not. */
     @Bean
     FilterRegistrationBean<RateLimitFilter> rateLimitFilter(RateLimitPolicy policy, RateLimitStore store, JsonMapper jsonMapper) {
@@ -63,7 +68,8 @@ class RateLimitConfig {
                         properties.plans().values().stream().flatMap(List::stream),
                         properties.anonymous().perClient().stream(),
                         properties.anonymous().perIp().stream(),
-                        properties.sharedNetworks().stream().flatMap(network -> network.perIp().stream()))
+                        properties.sharedNetworks().stream().flatMap(network -> network.perIp().stream()),
+                        properties.limits().values().stream().flatMap(List::stream))
                 .flatMap(limits -> limits)
                 .map(RateLimitProperties.Limit::period)
                 .max(Comparator.naturalOrder())

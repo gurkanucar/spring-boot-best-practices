@@ -185,6 +185,42 @@ Content-Type: application/problem+json
 header draft). `X-RateLimit-Bucket` is for this demo only; a real API would not reveal how it
 identifies callers.
 
+## Limits charged from code: 3 reports per hour per e-mail
+
+The filter only sees the request: API key, cookie, IP, path. Some rules need something only the
+application knows, e.g. "an e-mail address may request 3 reports per hour, whatever IP, browser or
+API key it uses". For those, `RateLimiter` charges a **named limit** from code, using the same store
+(in memory or Redis):
+
+```yaml
+app:
+  rate-limit:
+    limits:
+      report-per-email: [ { capacity: 3, period: 1h } ]
+```
+
+```java
+public Map<String, Object> generateMonthly(String email) {
+    String normalized = email.trim().toLowerCase(Locale.ROOT);  // else "Alice@x.com" is a new bucket
+    rateLimiter.consume("report-per-email", normalized);       // RateLimitExceededException -> 429
+    ...
+}
+```
+
+- `RateLimitExceptionHandler` turns the exception into the same 429 as the filter (`Retry-After`,
+  `RateLimit-*`, problem details).
+- The check is in `ReportService`, not in the controller: the rule belongs to generating a report,
+  so it also holds when a report is requested from a scheduled job or a message listener.
+- It comes **on top of** the filter: `/api/reports/monthly` still takes 1 token from the caller's
+  bucket.
+- The demo reads the e-mail from `X-User-Email` to stay small. Anyone can send any header: in a real
+  application take it from the authenticated user (JWT, session), never from the request.
+
+```bash
+for i in 1 2 3 4; do curl -s -o /dev/null -w "%{http_code} " -X POST -H "X-API-Key: demo-pro-key"   -H "X-User-Email: alice@example.com" $B/api/reports/monthly; done
+#   200 200 200 429   <- Retry-After: 1200 (one token every 20 minutes)
+```
+
 ## Where the buckets live
 
 | `app.rate-limit.store` | Class | |
@@ -220,6 +256,8 @@ app:
       - { name: campus, cidr: 10.20.0.0/16, per-ip: [ { capacity: 300, period: 1m } ] }
     costs:
       "[/api/reports/export]": 5
+    limits:                           # named limits charged from code (RateLimiter)
+      report-per-email: [ { capacity: 3, period: 1h } ]
 ```
 
 Choosing the numbers: the per-IP ceiling must be high enough for the biggest shared network you
@@ -231,6 +269,7 @@ expect; the real fairness comes from identity-based buckets.
 ratelimit/
   RateLimitFilter        charges /api/** requests, 429 + Retry-After, RateLimit-* headers, fail open
   RateLimitPolicy        which buckets a request belongs to (API key / anon cookie / IP), its cost
+  RateLimiter            named limits charged from code; RateLimitExceededException -> 429
   ClientIpResolver       real client IP from X-Forwarded-For, only through trusted proxies
   CidrRange, RateLimitBucket, RateLimitProperties, RateLimitConfig
 ratelimit/store/
@@ -239,6 +278,9 @@ ratelimit/store/
   RedisRateLimitStore    Bucket4j + Lettuce, shared by all instances
 demo/
   DemoController         /api/whoami, /api/products (1 token), /api/reports/export (5 tokens)
+report/
+  ReportController       POST /api/reports/monthly, e-mail from X-User-Email
+  ReportService          3 reports per hour per e-mail (RateLimiter)
 ```
 
 ## Tests
@@ -249,4 +291,6 @@ demo/
   401; `RateLimit-*` headers.
 - `RedisRateLimitStoreTest` (Testcontainers Redis): two "instances" share one bucket; every limit
   must have enough tokens; a request costing more than the capacity gets a bounded `Retry-After`.
+- `ReportRateLimitTest`: 3 reports per e-mail, then 429 while another e-mail still passes; case and
+  spaces in the e-mail do not give a fresh bucket.
 - `ClientIpResolverTest`, `FailOpenTest`.
