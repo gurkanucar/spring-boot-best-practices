@@ -1,0 +1,103 @@
+### The bearer-token API (/api/**), called the way a Flutter app, a SPA or another service calls it.
+#
+# Setup once: docker compose up -d, ./docker/logto/setup.sh (creates the API resource, its
+# permissions, the "api-demo-client" machine-to-machine app, and http/http-client.private.env.json),
+# then start the app (port 8101). In IntelliJ pick the "local" environment and run top to bottom.
+#
+# This token is for an APPLICATION (client credentials, no user). A Flutter app gets a token for a
+# USER instead (authorization code + PKCE through the Logto SDK, with the same "resource"); the API
+# checks it exactly the same way, only the permissions come from the user's roles.
+
+### 1. Get an access token for the API resource from Logto (client credentials)
+POST {{logto}}/oidc/token
+Authorization: Basic {{clientId}} {{clientSecret}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&resource={{apiResource}}&scope=read:reports write:reports
+
+> {%
+    client.test("token issued", () => client.assert(response.status === 200, response.body));
+    const token = response.body.access_token;
+    client.global.set("token", token);
+    // Only the permissions the client's roles grant: read:reports, not write:reports.
+    client.log("granted scope: " + response.body.scope);
+    // For step 7: one character changed inside the signature. (Appending a character would not do:
+    // an extra trailing base64url character carries no whole byte and is ignored when decoding.)
+    const i = token.length - 10;
+    client.global.set("tamperedToken", token.slice(0, i) + (token[i] === "A" ? "B" : "A") + token.slice(i + 1));
+%}
+
+### 2. Who am I? Any valid token: subject + client_id = the app, audience = this API
+GET {{app}}/api/whoami
+Authorization: Bearer {{token}}
+
+> {% client.test("200", () => client.assert(response.status === 200)); %}
+
+### 3. Read reports: needs read:reports -> 200
+GET {{app}}/api/reports
+Authorization: Bearer {{token}}
+
+> {% client.test("200", () => client.assert(response.status === 200)); %}
+
+### 4. Create a report: needs write:reports, which this client does not have -> 403
+POST {{app}}/api/reports
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{"name": "Q3"}
+
+> {% client.test("403", () => client.assert(response.status === 403)); %}
+
+### 5. No token -> 401 with WWW-Authenticate (never a redirect to a sign-in page)
+GET {{app}}/api/reports
+
+> {% client.test("401", () => client.assert(response.status === 401)); %}
+
+### 6a. A valid, signed Logto token for ANOTHER resource (the Management API; it carries no permissions)
+POST {{logto}}/oidc/token
+Authorization: Basic {{clientId}} {{clientSecret}}
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&resource=https://default.logto.app/api
+
+> {% client.global.set("otherToken", response.body.access_token); %}
+
+### 6b. ... is refused by this API -> 401: its "aud" is not http://localhost:8101/api
+GET {{app}}/api/whoami
+Authorization: Bearer {{otherToken}}
+
+> {% client.test("401", () => client.assert(response.status === 401)); %}
+
+### 7. A tampered token -> 401 "Invalid signature": it no longer matches Logto's key
+GET {{app}}/api/whoami
+Authorization: Bearer {{tamperedToken}}
+
+> {% client.test("401", () => client.assert(response.status === 401)); %}
+
+
+### ================================================================================================
+### As a signed-in USER: what a Flutter app does (authorization code + PKCE, public client, no secret)
+#
+# {{$auth.token("logto-user")}} uses the "logto-user" OAuth2 config that setup.sh wrote into
+# http-client.private.env.json (IntelliJ 2024.1+). On the first request IntelliJ opens Logto's sign-in
+# page in its built-in browser; sign in (or create an account: the code arrives at
+# http://localhost:8026). The token is cached and refreshed by the IDE.
+#
+# Permissions come from the user's Logto roles: new users get "user" (read). For write, give yourself
+# "admin": LOGTO_ADMIN_EMAIL=you@example.com ./docker/logto/setup.sh, then sign in again (in IntelliJ:
+# the token's context menu / "Clear" in the Auth tool window) so a new token carries the permission.
+
+### 8. Who am I? subject = the Logto user id, clientId = api-tester
+GET {{app}}/api/whoami
+Authorization: Bearer {{$auth.token("logto-user")}}
+
+### 9. Read reports: role "user" or "admin" -> 200
+GET {{app}}/api/reports
+Authorization: Bearer {{$auth.token("logto-user")}}
+
+### 10. Create a report: role "admin" -> 201, role "user" -> 403
+POST {{app}}/api/reports
+Authorization: Bearer {{$auth.token("logto-user")}}
+Content-Type: application/json
+
+{"name": "Created by a user"}

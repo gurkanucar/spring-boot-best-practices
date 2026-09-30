@@ -41,7 +41,7 @@
         <module name="validation" />
         <module name="logbook-logging-requests" />
       </profile>
-      <profile name="Annotation profile for jwt-auth-refresh-token-roles" enabled="true">
+      <profile name="Annotation profile for logto-basic-security" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />

@@ -22,6 +22,7 @@ cp .env.example .env        # LOGTO_CLIENT_ID, LOGTO_CLIENT_SECRET, LOGTO_WEBHOO
 | Logto admin console | http://localhost:3002: **open this one** to set Logto up |
 | Logto OIDC endpoint | `http://localhost:3001` (issuer `http://localhost:3001/oidc`): for the app, not a page to open. Opened directly it shows "Session not found" (`/unknown-session`): its sign-in page only works when an application sends the user there |
 | PostgreSQL | `localhost:5436`, database `app` (user `app` / `app`) for the application, `logto` for Logto |
+| Mailpit | http://localhost:8026: every mail Logto sends (sign-up and password reset codes) |
 | This app | http://localhost:8101 |
 
 One PostgreSQL server, two databases: Logto's `logto` (created by its seed, as `postgres`, since the
@@ -66,7 +67,99 @@ seed creates roles) and the application's `app` (`docker/postgres/init.sql`, its
      the app. "Send test event" in the console checks the connection.
 
 Users can sign up on Logto's sign-in page (username and password by default; change it under
-**Sign-in experience**).
+**Sign-in experience**, or run the script below).
+
+### E-mail sign-up and "forgot password" with Mailpit (scripted, optional)
+
+`docker/logto/setup.sh` configures Logto through its **Management API** instead of the console:
+
+- an **SMTP e-mail connector** pointing at the `mailpit` container (`mailpit:1025`), with code
+  templates for sign-up, sign-in, password reset and generic verification;
+- the **sign-in experience**: sign up with e-mail + password (the e-mail is verified with a code),
+  sign in with e-mail or username + password, "Forgot password?" by e-mail code;
+- the **API resource**, permissions, roles and the `api-demo-client` for `/api/**` (see below).
+
+Matching items in the Management API's JSON lists uses `jq`; without a local one the script runs
+the official `ghcr.io/jqlang/jq` image through Docker.
+
+It needs a machine-to-machine application once (the Management API has no anonymous access):
+
+1. **Applications → Create application → Machine-to-machine**, e.g. `setup-script`, and assign it
+   the **Logto Management API access** role.
+2. Put its credentials into `.env`: `LOGTO_M2M_CLIENT_ID`, `LOGTO_M2M_CLIENT_SECRET`.
+3. `./docker/logto/setup.sh` (safe to run again; it updates the connector instead of adding one).
+
+Then sign up on Logto's page (open http://localhost:8101/me → "Create account"), and read the code
+at http://localhost:8026. "Forgot password?" on the sign-in page sends a reset code the same way.
+Logto sends **codes**, not links. Mailpit accepts any SMTP login (`MP_SMTP_AUTH_ACCEPT_ANY`), because
+Logto's SMTP connector always sends credentials.
+
+## Mobile (Flutter) and SPA clients, and "my own login screen"
+
+Logto does **not** let an app collect the password in its own form and post it to an API: the
+password grant (ROPC) is deprecated in OAuth 2.1 and Logto does not offer it. The password only ever
+goes to Logto. The options:
+
+| Option | How | Own UI? |
+|---|---|---|
+| Logto SDK + browser (recommended) | Flutter: `logto_dart_sdk` `signIn()` opens an in-app browser (ASWebAuthenticationSession / Custom Tabs) on Logto's page and returns through a redirect URI; SPAs redirect the same way (authorization code + PKCE) | Logto's page, branded in the console (logo, colours, custom CSS, languages) |
+| Bring your own UI + Experience API | You write the sign-in / sign-up / reset pages; they call Logto's Experience API. They still run inside the OIDC flow, served by Logto, in a browser | Fully yours, but a web page, not native widgets |
+| Fully native form | Not possible with Logto; the backend would have to take the password itself (as `jwt-auth-refresh-token-roles` does) | Yes, without Logto |
+
+Either way the client ends up with an **access token** and calls the Spring Boot API with
+`Authorization: Bearer ...`. This module has that API too, next to the browser sign-in:
+
+| | Browser pages (`SecurityConfig`) | `/api/**` (`ApiSecurityConfig`) |
+|---|---|---|
+| Spring Security role | OAuth2 **client** (`oauth2Login`) | OAuth2 **resource server** (bearer JWT) |
+| Not signed in | 302 to Logto | 401 + `WWW-Authenticate: Bearer` |
+| State | session cookie, CSRF | stateless, no CSRF |
+| Checks | roles (`ROLE_admin`, `ROLE_user`) | permissions (`SCOPE_read:reports`, `SCOPE_write:reports`) |
+
+- `GET /api/whoami` (any valid token), `GET /api/reports` (`read:reports`), `POST /api/reports`
+  (`write:reports`).
+- A token is accepted only if it is an **RFC 9068 access token** (`typ: at+jwt`, which is what Logto
+  issues; Spring Security's default validator only accepts `JWT` and would reject every Logto access
+  token), from `app.api.issuer`, with `app.api.audience` (the API resource indicator) in `aud`.
+  Tokens for the Management API or another service, and ID tokens, are refused.
+- Access tokens carry **permissions**, not role names: in Logto a role grants permissions
+  (`user` → `read:reports`, `admin` → both), and the API only asks for the permission.
+- `docker/logto/setup.sh` creates the API resource `http://localhost:8101/api`, its two permissions,
+  the roles, and a machine-to-machine client **`api-demo-client`** (role `api-client`: read only),
+  and writes its credentials to `http/http-client.private.env.json` (git-ignored).
+- **`http/api.http`** (IntelliJ HTTP Client, environment `local`): token by client credentials →
+  `whoami` → `GET` 200 → `POST` 403 (read-only client) → no token 401 → a Management API token 401
+  → a tampered token 401.
+
+A Flutter app gets a token for a **user** instead (authorization code + PKCE through the Logto SDK,
+with `resource: http://localhost:8101/api`); the API checks it the same way, with the permissions
+coming from the user's roles.
+
+### Trying it as a user (Postman or IntelliJ)
+
+The token the browser sign-in of this app obtains cannot be reused: it stays on the server (the
+browser only gets a session cookie), and it is an opaque token for Logto's userinfo, not for this API
+(no `resource`). A client that wants a token for `/api/**` signs the user in itself. `setup.sh` creates
+a public client for that, **`api-tester`** (SPA type: no secret, PKCE), with the Postman and IntelliJ
+callbacks as redirect URIs. New sign-ups get the `user` role (Logto default role);
+`LOGTO_ADMIN_EMAIL=you@example.com ./docker/logto/setup.sh` makes an existing user an `admin`.
+
+- **IntelliJ**: requests 8-10 in `http/api.http` use `{{$auth.token("logto-user")}}`; the OAuth2
+  configuration is in the generated `http-client.private.env.json`.
+- **Postman**: Authorization → OAuth 2.0 → Get New Access Token
+
+  | Field | Value |
+  |---|---|
+  | Grant type | Authorization Code (With PKCE) |
+  | Callback URL | `https://oauth.pstmn.io/v1/callback` ("Authorize using browser") |
+  | Auth URL / Access Token URL | `http://localhost:3001/oidc/auth` / `http://localhost:3001/oidc/token` |
+  | Client ID | printed by `setup.sh` (`api-tester`); Client Secret empty |
+  | Scope | `openid profile read:reports write:reports` |
+  | Advanced → Resource | `http://localhost:8101/api` (auth **and** token request) |
+
+  Without the resource Logto issues an opaque token for its own userinfo endpoint, which this API
+  answers with 401. Logto only grants the requested permissions the user's roles allow: a `user`
+  gets `read:reports` (POST → 403), an `admin` gets both.
 
 ## Try it
 

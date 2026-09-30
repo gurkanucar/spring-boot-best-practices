@@ -34,3 +34,5 @@ build/
 
 ### Local secrets ###
 .env
+# Written by docker/logto/setup.sh: the api-demo-client secret for http/api.http.
+http/http-client.private.env.json

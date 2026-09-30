@@ -3,7 +3,20 @@
 #   Logto OIDC endpoint : http://localhost:3001   (issuer: http://localhost:3001/oidc)
 #   Logto admin console : http://localhost:3002
 #   PostgreSQL          : localhost:5436          (databases: logto, app)
+#   Mailpit web UI      : http://localhost:8026   (every mail Logto sends: verification / reset codes)
 services:
+  # Catches Logto's e-mails. Logto's SMTP connector reaches it at mailpit:1025 (docker/logto/setup.sh).
+  # Host ports 1026/8026 so it does not clash with the Mailpit of jwt-auth-refresh-token-roles (1025/8025).
+  mailpit:
+    image: axllent/mailpit
+    environment:
+      # Logto's SMTP connector always sends credentials; accept any, over plain SMTP (local only).
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    ports:
+      - "127.0.0.1:1026:1025"
+      - "127.0.0.1:8026:8025"
+
   postgres:
     image: postgres:17-alpine
     environment:

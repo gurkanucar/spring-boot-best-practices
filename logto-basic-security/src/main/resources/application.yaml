@@ -44,6 +44,11 @@ app:
   logto:
     # Signs Logto's webhook requests (Webhooks -> your webhook -> Signing key). Empty: webhooks rejected.
     webhook-signing-key: ${LOGTO_WEBHOOK_SIGNING_KEY:}
+  api:
+    # The bearer-token API (/api/**). Tokens must come from this issuer and be issued for this API
+    # resource: its indicator in Logto (API resources), which Logto puts into the token's "aud".
+    issuer: http://localhost:3001/oidc
+    audience: http://localhost:8101/api
 
 server:
   port: 8101
