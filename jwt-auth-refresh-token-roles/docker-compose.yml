@@ -1,0 +1,25 @@
+# Local infrastructure: docker compose up -d
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: jwtauth-postgres
+    environment:
+      POSTGRES_DB: jwtauth
+      POSTGRES_USER: jwtauth
+      POSTGRES_PASSWORD: jwtauth
+    ports:
+      # 5435 on the host, so it does not clash with the other modules (5434) or a local Postgres (5432).
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jwtauth -d jwtauth"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Catches every outgoing mail. Web UI: http://localhost:8025
+  mailpit:
+    image: axllent/mailpit
+    container_name: jwtauth-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI

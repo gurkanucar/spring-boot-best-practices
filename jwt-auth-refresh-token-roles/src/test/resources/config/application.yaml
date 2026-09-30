@@ -1,0 +1,14 @@
+# Loaded on top of src/main/resources/application.yaml in every test.
+spring:
+  datasource:
+    url: jdbc:h2:mem:jwtauth;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  mail:
+    # JavaMailSender is mocked in the tests that send mail; nothing listens here.
+    host: localhost
+    port: 3025
+
+security:
+  # Tests call ExpiredEntryCleanupJob directly instead.
+  token-cleanup-cron: "-"

@@ -1,0 +1,76 @@
+spring:
+  application:
+    name: jwt-auth-refresh-token-roles
+  datasource:
+    url: jdbc:postgresql://localhost:5435/jwtauth
+    username: jwtauth
+    password: jwtauth
+  jpa:
+    open-in-view: false
+    hibernate:
+      # No migration tool in this example: Hibernate creates and updates the tables.
+      ddl-auto: update
+  mail:
+    host: localhost
+    port: 1025
+    properties:
+      # JavaMail waits forever by default; a hung SMTP host would hang every request that sends mail.
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
+server:
+  port: 8102
+
+app:
+  # Used to build the links in mails.
+  base-url: http://localhost:8102
+  seed:
+    admin-email: ${ADMIN_EMAIL:admin@example.com}
+    admin-password: ${ADMIN_PASSWORD:admin12345}
+  mail:
+    from: no-reply@example.com
+
+security:
+  # Explicit list: /api/auth/change-password is under /api/auth but requires authentication,
+  # so a /api/auth/** wildcard must not be used here.
+  public-paths:
+    - /api/auth/register
+    - /api/auth/login
+    - /api/auth/refresh
+    - /api/auth/logout
+    - /api/auth/verify-email
+    - /api/auth/verify-email/submit
+    - /api/auth/resend-verification
+    - /api/auth/forgot-password
+    - /api/auth/reset-password
+    - /api/auth/reset-password/submit
+    - /api/public/**
+    - /.well-known/jwks.json
+    - /swagger-ui/**
+    - /swagger-ui.html
+    - /v3/api-docs/**
+  # Deletes expired refresh tokens and one-time codes. "-" disables the job.
+  token-cleanup-cron: "0 0 * * * *"
+  password:
+    min-length: 8
+  jwt:
+    issuer: http://localhost:8102
+    key-id: demo-key-1
+    # Demo keys committed to the repository. Point these at file:/... in a real deployment.
+    private-key: classpath:keys/app.key
+    public-key: classpath:keys/app.pub
+    access-token-ttl: 30m
+    refresh-token-ttl: 2d
+
+otp:
+  # HMAC key for numeric (SMS) codes. At least 32 bytes; set OTP_PEPPER outside local development.
+  pepper: ${OTP_PEPPER:change-me-demo-pepper-at-least-32-bytes}
+  # A new code for the same user, purpose, channel and target is not sent within this window.
+  cooldown: 60s
+  # Wrong SMS codes allowed before the code is deleted.
+  max-attempts: 5
+  ttl:
+    password-reset: 15m
+    email-verification: 24h
+    phone-verification: 5m

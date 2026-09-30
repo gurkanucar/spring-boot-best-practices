@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title}">Result</title>
+    <style>
+        body { margin: 0; padding: 24px; background: #f5f7fa; font-family: Arial, Helvetica, sans-serif; color: #1f2933; }
+        .card { max-width: 420px; margin: 40px auto; background: #ffffff; border-radius: 8px; padding: 24px; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+        h1 { font-size: 20px; margin-top: 0; }
+        .ok { color: #15803d; }
+        .fail { color: #b91c1c; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1 th:class="${success} ? 'ok' : 'fail'" th:text="${title}">Title</h1>
+    <p th:text="${message}">Message</p>
+</div>
+</body>
+</html>

@@ -25,6 +25,7 @@ they stay here on purpose so they are not forgotten.
 | [`rest-api-design`](rest-api-design/) | REST API design: resources, status codes, pagination, versioning, ETag, ProblemDetail |
 | [`rest-api-integration`](rest-api-integration/) | Calling external APIs with `RestClient`: timeouts, retry, circuit breaker, idempotency |
 | [`validation`](validation/) | Request validation with Jakarta Validation |
+| [`jwt-auth-refresh-token-roles`](jwt-auth-refresh-token-roles/) | Stateless JWT auth with Spring Security only: RS256 + JWKS, rotated refresh tokens, roles, OTP (mail/SMS), custom claims |
 | [`swagger-openapi-docs`](swagger-openapi-docs/) | OpenAPI / Swagger documentation |
 | [`jackson`](jackson/) | JSON serialization with Jackson |
 | [`er-one-to-one`](er-one-to-one/), [`er-one-to-many`](er-one-to-many/), [`er-many-to-many`](er-many-to-many/) | JPA entity relationships |
@@ -310,12 +311,12 @@ Retries are not automatically safe. Before retrying, think about:
 - [ ] Spring Security
 - [ ] Authentication vs authorization
 - [ ] Session-based authentication
-- [ ] JWT
+- [ ] JWT → [demo](jwt-auth-refresh-token-roles/)
 - [ ] OAuth 2.0
 - [ ] OpenID Connect
-- [ ] Access tokens / refresh tokens
-- [ ] Roles and permissions, RBAC
-- [ ] Method-level authorization
+- [ ] Access tokens / refresh tokens → [demo](jwt-auth-refresh-token-roles/)
+- [ ] Roles and permissions, RBAC → [demo](jwt-auth-refresh-token-roles/)
+- [ ] Method-level authorization → [demo](jwt-auth-refresh-token-roles/)
 - [ ] Multi-tenancy and tenant isolation
 - [ ] Password hashing
 
