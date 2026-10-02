@@ -1,0 +1,27 @@
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+logbook:
+  filter:
+    enabled: true
+  strategy: status-at-least
+  minimum-status: 500
+
+management:
+  endpoint:
+    health:
+      show-details: never
+  tracing:
+    sampling:
+      probability: 0.1
+  opentelemetry:
+    resource-attributes:
+      deployment.environment: production
+
+logging:
+  level:
+    org.zalando.logbook: TRACE
+    com.gucardev.openobserve: INFO

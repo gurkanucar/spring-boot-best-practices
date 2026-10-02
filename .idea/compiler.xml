@@ -11,6 +11,15 @@
         <module name="caching" />
         <module name="rate-limiting-bucket4j" />
       </profile>
+      <profile name="Annotation profile for open-observe" enabled="true">
+        <sourceOutputDir name="target/generated-sources/annotations" />
+        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
+        </processorPath>
+        <module name="open-observe" />
+      </profile>
       <profile name="Annotation profile for validation" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
@@ -20,7 +29,9 @@
           <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
         </processorPath>
         <module name="kafka-outbox-pattern-flight-data-updates-example" />
+        <module name="jwt-auth-refresh-token-roles" />
         <module name="er-one-to-many" />
+        <module name="logto-basic-security" />
         <module name="kafka-inbox-pattern-airports-data-filling-example" />
         <module name="er-one-to-one" />
         <module name="report-generation-light-task-with-scheduler" />
@@ -37,19 +48,10 @@
         <module name="entity-encryption" />
         <module name="slf4j-logging" />
         <module name="report-generation-light-task-with-jobrunr" />
+        <module name="otp-verification" />
         <module name="file-operations-io" />
         <module name="validation" />
         <module name="logbook-logging-requests" />
-      </profile>
-      <profile name="Annotation profile for logto-basic-security" enabled="true">
-        <sourceOutputDir name="target/generated-sources/annotations" />
-        <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
-        <outputRelativeToContentRoot value="true" />
-        <processorPath useClasspath="false">
-          <entry name="$MAVEN_REPOSITORY$/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar" />
-        </processorPath>
-        <module name="jwt-auth-refresh-token-roles" />
-        <module name="logto-basic-security" />
       </profile>
     </annotationProcessing>
   </component>
@@ -71,6 +73,8 @@
       <module name="kafka-outbox-pattern-flight-data-updates-example" options="-parameters" />
       <module name="logbook-logging-requests" options="-parameters" />
       <module name="logto-basic-security" options="-parameters" />
+      <module name="open-observe" options="-parameters" />
+      <module name="otp-verification" options="-parameters" />
       <module name="quartz-scheduler-shedlock" options="-parameters" />
       <module name="rate-limiting-bucket4j" options="-parameters" />
       <module name="report-generation-light-task-with-jobrunr" options="-parameters" />

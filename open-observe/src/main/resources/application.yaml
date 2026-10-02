@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: spring-boot-open-observe
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:observedb}
+    username: ${POSTGRES_USER:observe}
+    password: ${POSTGRES_PASSWORD:observe}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+
+logbook:
+  filter:
+    enabled: false
+  format:
+    style: http
+  obfuscate:
+    headers:
+      - Authorization
+      - Cookie
+      - Set-Cookie
+    # Matched by field name anywhere in the JSON tree, on the raw body, so a field the
+    # DTO ignores is still masked.
+    json-body-fields:
+      - password
+      - token
+      - secret
+      - apiKey
+  write:
+    max-body-size: 4096
+  predicate:
+    exclude:
+      - path: /actuator/**
+      - path: /v3/api-docs/**
+      - path: /swagger-ui/**
+      - path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+  observations:
+    annotations:
+      enabled: true
+
+  tracing:
+    sampling:
+      probability: 1.0
+    propagation:
+      type: w3c
+
+  metrics:
+    distribution:
+      percentiles-histogram:
+        "[http.server.requests]": true
+
+  opentelemetry:
+    resource-attributes:
+      deployment.environment: local
+    tracing:
+      export:
+        otlp:
+          endpoint: http://localhost:5080/api/default/v1/traces
+          headers:
+            Authorization: ${OPENOBSERVE_AUTH_TOKEN:Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=}
+            # Streams are created on first ingestion; no setup call is needed. Metrics
+            # ignore this header and get one stream per metric name instead.
+            stream-name: ${OPENOBSERVE_STREAM:springboot_observe}
+    logging:
+      export:
+        otlp:
+          endpoint: http://localhost:5080/api/default/v1/logs
+          headers:
+            Authorization: ${OPENOBSERVE_AUTH_TOKEN:Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=}
+            stream-name: ${OPENOBSERVE_STREAM:springboot_observe}
+
+  otlp:
+    metrics:
+      export:
+        url: http://localhost:5080/api/default/v1/metrics
+        step: 15s
+        headers:
+          Authorization: ${OPENOBSERVE_AUTH_TOKEN:Basic cm9vdEBleGFtcGxlLmNvbTpDb21wbGV4cGFzcyMxMjM=}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+
+# Prefix is jdbc.datasource-proxy, not spring.datasource-proxy.
+jdbc:
+  datasource-proxy:
+    include-parameter-values: true
+    query:
+      enable-logging: false

@@ -39,6 +39,7 @@ they stay here on purpose so they are not forgotten.
 | [`rate-limiting-bucket4j`](rate-limiting-bucket4j/) | Per-client API rate limiting with Bucket4j token buckets, in memory or shared in Redis |
 | [`slf4j-logging`](slf4j-logging/) | Logging with SLF4J: levels, MDC, structured logs, masking |
 | [`logbook-logging-requests`](logbook-logging-requests/) | HTTP request / response logging with Logbook |
+| [`open-observe`](open-observe/) | OpenTelemetry traces, metrics and logs exported to OpenObserve (OTLP), with Logbook and trace-correlated logs |
 | [`kafka-outbox-pattern-flight-data-updates-example`](kafka-outbox-pattern-flight-data-updates-example/) | Transactional outbox with Kafka |
 | [`kafka-inbox-pattern-airports-data-filling-example`](kafka-inbox-pattern-airports-data-filling-example/) | Inbox pattern / idempotent Kafka consumer |
 | [`quartz-scheduler-shedlock`](quartz-scheduler-shedlock/) | Scheduled jobs with Quartz and ShedLock on several instances |

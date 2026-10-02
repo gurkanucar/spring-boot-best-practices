@@ -1,0 +1,65 @@
+services:
+  openobserve:
+    image: public.ecr.aws/zinclabs/openobserve:latest
+    container_name: openobserve
+    restart: unless-stopped
+    ports:
+      - "5080:5080"
+    environment:
+      ZO_ROOT_USER_EMAIL: ${ZO_ROOT_USER_EMAIL:-root@example.com}
+      ZO_ROOT_USER_PASSWORD: ${ZO_ROOT_USER_PASSWORD:-Complexpass#123}
+      ZO_DATA_DIR: /data
+      ZO_TELEMETRY_ENABLED: "false"
+      # Global retention in days; image default is 3650. Per-stream 0 = inherit this.
+      ZO_COMPACT_DATA_RETENTION_DAYS: ${ZO_COMPACT_DATA_RETENTION_DAYS:-14}
+      # Alert email goes to Mailpit over the compose network. Port 1025 is plain SMTP, so
+      # encryption has to be forced off: the port-derived default would try STARTTLS.
+      ZO_SMTP_ENABLED: "true"
+      ZO_SMTP_HOST: mailpit
+      ZO_SMTP_PORT: "1025"
+      ZO_SMTP_FROM_EMAIL: ${ZO_SMTP_FROM_EMAIL:-alerts@springboot-open-observe.local}
+      ZO_SMTP_ENCRYPTION: none
+    depends_on:
+      - mailpit
+    volumes:
+      - openobserve-data:/data
+    #   curl -s -o /dev/null -w '%{http_code}' http://localhost:5080/healthz
+
+  mailpit:
+    # Catches every alert mail instead of delivering it. UI on 8025, SMTP on 1025.
+    image: axllent/mailpit:latest
+    container_name: observe-mailpit
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+    environment:
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: observe-postgres
+    restart: unless-stopped
+    ports:
+      # 5433 on the host: a locally installed Postgres commonly already owns 5432, and the
+      # app would silently connect to that one instead.
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-observedb}
+      POSTGRES_USER: ${POSTGRES_USER:-observe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-observe}
+    volumes:
+      # Postgres 18+ wants a single mount at /var/lib/postgresql, not .../data - the image
+      # refuses to start otherwise.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-observe} -d ${POSTGRES_DB:-observedb}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  openobserve-data:
+  postgres-data:

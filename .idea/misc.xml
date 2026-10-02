@@ -30,6 +30,8 @@
         <option value="$PROJECT_DIR$/rate-limiting-bucket4j/pom.xml" />
         <option value="$PROJECT_DIR$/logto-basic-security/pom.xml" />
         <option value="$PROJECT_DIR$/jwt-auth-refresh-token-roles/pom.xml" />
+        <option value="$PROJECT_DIR$/otp-verification/pom.xml" />
+        <option value="$PROJECT_DIR$/open-observe/pom.xml" />
       </list>
     </option>
   </component>

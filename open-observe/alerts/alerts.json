@@ -1,0 +1,138 @@
+{
+  "template": {
+    "name": "springboot_alert_email",
+    "type": "email",
+    "title": "[__STREAM__] {alert_name}",
+    "body": "<h2>{alert_name}</h2><p>{alert_count} row(s) matched <b>{alert_operator} {alert_threshold}</b> over the last {alert_period} minutes, in {stream_type} stream <b>{stream_name}</b> ({org_name}).</p><p>Window: {alert_start_time} &rarr; {alert_end_time}</p><p><a href=\"{alert_url}\">Open in OpenObserve</a></p><pre>{rows}</pre>"
+  },
+  "destination": {
+    "name": "springboot_alert_mail",
+    "type": "email",
+    "emails": [
+      "__ALERT_EMAIL__"
+    ],
+    "template": "springboot_alert_email"
+  },
+  "alerts": [
+    {
+      "name": "error_log_spike",
+      "description": "At least 10 ERROR logs in the last hour.",
+      "stream_type": "logs",
+      "stream_name": "__STREAM__",
+      "is_real_time": false,
+      "enabled": true,
+      "destinations": [
+        "springboot_alert_mail"
+      ],
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT to_char(to_timestamp_micros(_timestamp), '%Y-%m-%d %H:%M:%S') as at, severity, body, code_namespace, trace_id FROM \"__STREAM__\" WHERE severity = 'ERROR'"
+      },
+      "trigger_condition": {
+        "period": 60,
+        "frequency": 5,
+        "frequency_type": "minutes",
+        "operator": ">=",
+        "threshold": 10,
+        "silence": 60
+      },
+      "row_template": "{at}  {code_namespace}  {body}  trace={trace_id}<br>",
+      "row_template_type": "String"
+    },
+    {
+      "name": "unhandled_exception_logged",
+      "description": "Fires as soon as a log body contains 'Unhandled exception'.",
+      "stream_type": "logs",
+      "stream_name": "__STREAM__",
+      "is_real_time": true,
+      "enabled": true,
+      "destinations": [
+        "springboot_alert_mail"
+      ],
+      "query_condition": {
+        "type": "custom",
+        "conditions": {
+          "and": [
+            {
+              "column": "body",
+              "operator": "contains",
+              "value": "Unhandled exception",
+              "ignore_case": true
+            }
+          ]
+        }
+      },
+      "trigger_condition": {
+        "period": 1,
+        "frequency": 60,
+        "frequency_type": "minutes",
+        "operator": ">=",
+        "threshold": 1,
+        "silence": 30
+      },
+      "row_template": "{body}  trace={trace_id}<br>",
+      "row_template_type": "String"
+    },
+    {
+      "name": "slow_http_request",
+      "description": "Any server span slower than 1s in the last 5 minutes. Span durations are microseconds.",
+      "stream_type": "traces",
+      "stream_name": "__STREAM__",
+      "is_real_time": false,
+      "enabled": true,
+      "destinations": [
+        "springboot_alert_mail"
+      ],
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT to_char(to_timestamp_micros(_timestamp), '%Y-%m-%d %H:%M:%S') as at, operation_name, duration / 1000.0 as duration_ms, trace_id FROM \"__STREAM__\" WHERE span_kind = 2 AND duration > 1000000"
+      },
+      "trigger_condition": {
+        "period": 5,
+        "frequency": 5,
+        "frequency_type": "minutes",
+        "operator": ">=",
+        "threshold": 1,
+        "silence": 30
+      },
+      "row_template": "{at}  {operation_name}  {duration_ms}ms  trace={trace_id}<br>",
+      "row_template_type": "String"
+    },
+    {
+      "name": "no_traces_received",
+      "description": "No server span in the last 10 minutes - the app is down or OTLP export broke. The query spans 6 hours so it still returns a row while the app is silent; the 10-minute window is the conditional sum.",
+      "stream_type": "traces",
+      "stream_name": "__STREAM__",
+      "is_real_time": false,
+      "enabled": true,
+      "destinations": [
+        "springboot_alert_mail"
+      ],
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT service_name, sum(CASE WHEN _timestamp > (extract(epoch from now()) * 1000000 - 600000000) THEN 1 ELSE 0 END) as recent FROM \"__STREAM__\" WHERE span_kind = 2 GROUP BY service_name",
+        "aggregation": {
+          "group_by": [
+            "service_name"
+          ],
+          "function": "count",
+          "having": {
+            "column": "recent",
+            "operator": "<",
+            "value": 1
+          }
+        }
+      },
+      "trigger_condition": {
+        "period": 360,
+        "frequency": 5,
+        "frequency_type": "minutes",
+        "operator": ">=",
+        "threshold": 1,
+        "silence": 30
+      },
+      "row_template": "{service_name}: {recent} server spans in the last 10 minutes<br>",
+      "row_template_type": "String"
+    }
+  ]
+}

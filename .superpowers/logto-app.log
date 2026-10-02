@@ -1,0 +1,44 @@
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-09-30T14:26:23.756+03:00  INFO 19068 --- [logto-basic-security] [           main] c.g.l.LogtoBasicSecurityApplication      : Starting LogtoBasicSecurityApplication using Java 25 with PID 19068 (D:\software_projects\spring-boot-best-practices\logto-basic-security\target\classes started by user in D:\software_projects\spring-boot-best-practices\logto-basic-security)
+2026-09-30T14:26:23.760+03:00  INFO 19068 --- [logto-basic-security] [           main] c.g.l.LogtoBasicSecurityApplication      : No active profile set, falling back to 1 default profile: "default"
+2026-09-30T14:26:24.336+03:00  INFO 19068 --- [logto-basic-security] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-09-30T14:26:24.386+03:00  INFO 19068 --- [logto-basic-security] [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 41 ms. Found 1 JPA repository interface.
+2026-09-30T14:26:24.935+03:00  INFO 19068 --- [logto-basic-security] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8101 (http)
+2026-09-30T14:26:24.965+03:00  INFO 19068 --- [logto-basic-security] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-09-30T14:26:24.965+03:00  INFO 19068 --- [logto-basic-security] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.24]
+2026-09-30T14:26:25.021+03:00  INFO 19068 --- [logto-basic-security] [           main] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 1218 ms
+2026-09-30T14:26:25.203+03:00  INFO 19068 --- [logto-basic-security] [           main] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-09-30T14:26:25.241+03:00  INFO 19068 --- [logto-basic-security] [           main] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.4.5.Final
+2026-09-30T14:26:25.671+03:00  INFO 19068 --- [logto-basic-security] [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-09-30T14:26:25.702+03:00  INFO 19068 --- [logto-basic-security] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-09-30T14:26:25.871+03:00  INFO 19068 --- [logto-basic-security] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@ba0018e
+2026-09-30T14:26:25.873+03:00  INFO 19068 --- [logto-basic-security] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-09-30T14:26:25.934+03:00  INFO 19068 --- [logto-basic-security] [           main] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [jdbc:postgresql://localhost:5436/app]
+	Database driver: PostgreSQL JDBC Driver
+	Database dialect: PostgreSQLDialect
+	Database version: 17.10
+	Default catalog/schema: app/public
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: none
+	Pool: DataSourceConnectionProvider
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-09-30T14:26:26.715+03:00  INFO 19068 --- [logto-basic-security] [           main] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-09-30T14:26:26.779+03:00  INFO 19068 --- [logto-basic-security] [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-09-30T14:26:26.882+03:00  INFO 19068 --- [logto-basic-security] [           main] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-09-30T14:26:28.255+03:00  INFO 19068 --- [logto-basic-security] [           main] o.s.boot.tomcat.TomcatWebServer          : Tomcat started on port 8101 (http) with context path '/'
+2026-09-30T14:26:28.259+03:00  INFO 19068 --- [logto-basic-security] [           main] c.g.l.LogtoBasicSecurityApplication      : Started LogtoBasicSecurityApplication in 4.934 seconds (process running for 5.275)
+2026-09-30T14:26:39.636+03:00  INFO 19068 --- [logto-basic-security] [nio-8101-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-09-30T14:26:39.636+03:00  INFO 19068 --- [logto-basic-security] [nio-8101-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-09-30T14:26:39.637+03:00  INFO 19068 --- [logto-basic-security] [nio-8101-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 1 ms

@@ -1,0 +1,848 @@
+{
+  "version": 5,
+  "dashboardId": "",
+  "title": "Spring Boot observability",
+  "description": "Resources, traffic, latency, errors and logs for one service. The stream name is substituted at import time, so the same file serves any service exporting these signals.",
+  "role": "",
+  "owner": "",
+  "created": "2026-09-19T00:00:00Z",
+  "defaultDatetimeDuration": {
+    "type": "relative",
+    "relativeTimePeriod": "6h"
+  },
+  "tabs": [
+    {
+      "tabId": "default",
+      "name": "Overview",
+      "panels": [
+        {
+          "id": "panel_1",
+          "type": "gauge",
+          "title": "CPU usage",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT value as y_axis_1 FROM \"process_cpu_usage\" ORDER BY _timestamp DESC LIMIT 1",
+              "customQuery": true,
+              "fields": {
+                "stream": "process_cpu_usage",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "CPU usage",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 12,
+            "h": 7,
+            "i": 1,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "unit": "percent-1",
+            "y_axis_min": 0,
+            "y_axis_max": 1
+          }
+        },
+        {
+          "id": "panel_2",
+          "type": "gauge",
+          "title": "Heap used",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT sum(value) as y_axis_1 FROM \"jvm_memory_used\" WHERE area = 'heap' GROUP BY _timestamp ORDER BY _timestamp DESC LIMIT 1",
+              "customQuery": true,
+              "fields": {
+                "stream": "jvm_memory_used",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Heap used",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 12,
+            "y": 0,
+            "w": 12,
+            "h": 7,
+            "i": 2,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "unit": "bytes",
+            "y_axis_min": 0
+          }
+        },
+        {
+          "id": "panel_3",
+          "type": "gauge",
+          "title": "Live threads",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT value as y_axis_1 FROM \"jvm_threads_live\" ORDER BY _timestamp DESC LIMIT 1",
+              "customQuery": true,
+              "fields": {
+                "stream": "jvm_threads_live",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Live threads",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 0,
+            "w": 12,
+            "h": 7,
+            "i": 3,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "y_axis_min": 0,
+            "decimals": 0
+          }
+        },
+        {
+          "id": "panel_4",
+          "type": "gauge",
+          "title": "Active DB connections",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT value as y_axis_1 FROM \"hikaricp_connections_active\" ORDER BY _timestamp DESC LIMIT 1",
+              "customQuery": true,
+              "fields": {
+                "stream": "hikaricp_connections_active",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [
+                  {
+                    "label": "Active DB connections",
+                    "alias": "y_axis_1",
+                    "column": "y_axis_1"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 36,
+            "y": 0,
+            "w": 12,
+            "h": 7,
+            "i": 4,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "y_axis_min": 0,
+            "decimals": 0
+          }
+        },
+        {
+          "id": "panel_5",
+          "type": "area",
+          "title": "JVM memory used by pool",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, max(value) as y_axis_1, id as breakdown_1 FROM \"jvm_memory_used\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "jvm_memory_used",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "JVM memory used by pool",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 7,
+            "w": 24,
+            "h": 9,
+            "i": 5,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "bytes"
+          }
+        },
+        {
+          "id": "panel_6",
+          "type": "line",
+          "title": "CPU usage over time",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, max(value) as y_axis_1 FROM \"process_cpu_usage\" GROUP BY x_axis_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "process_cpu_usage",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "CPU usage over time",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 7,
+            "w": 24,
+            "h": 9,
+            "i": 6,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "percent-1"
+          }
+        },
+        {
+          "id": "panel_7",
+          "type": "line",
+          "title": "Request rate by endpoint",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, sum(value) as y_axis_1, uri as breakdown_1 FROM \"http_server_requests_count\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_requests_count",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Request rate by endpoint",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 24,
+            "h": 9,
+            "i": 7,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null
+          }
+        },
+        {
+          "id": "panel_8",
+          "type": "bar",
+          "title": "Failed requests by status",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, sum(value) as y_axis_1, status as breakdown_1 FROM \"http_server_requests_count\" WHERE status >= '400' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_requests_count",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Failed requests by status",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 16,
+            "w": 24,
+            "h": 9,
+            "i": 8,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null
+          }
+        },
+        {
+          "id": "panel_9",
+          "type": "area",
+          "title": "Time spent per endpoint",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, sum(value) as y_axis_1, uri as breakdown_1 FROM \"http_server_requests_sum\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "http_server_requests_sum",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Time spent per endpoint",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 25,
+            "w": 24,
+            "h": 9,
+            "i": 9,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "milliseconds"
+          }
+        },
+        {
+          "id": "panel_10",
+          "type": "line",
+          "title": "Slowest service method",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, max(value) as y_axis_1, method as breakdown_1 FROM \"__SERVICE_METRIC___max\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "__SERVICE_METRIC___max",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Slowest service method",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 25,
+            "w": 24,
+            "h": 9,
+            "i": 10,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "milliseconds"
+          }
+        },
+        {
+          "id": "panel_11",
+          "type": "bar",
+          "title": "Service errors by exception",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, sum(value) as y_axis_1, error as breakdown_1 FROM \"__SERVICE_METRIC___count\" WHERE error != 'none' GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "__SERVICE_METRIC___count",
+                "stream_type": "metrics",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Service errors by exception",
+                    "alias": "y_axis_1",
+                    "column": "value"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 34,
+            "w": 24,
+            "h": 9,
+            "i": 11,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null
+          }
+        },
+        {
+          "id": "panel_12",
+          "type": "area",
+          "title": "Log volume by severity",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT histogram(_timestamp) as x_axis_1, count(*) as y_axis_1, severity as breakdown_1 FROM \"__STREAM__\" GROUP BY x_axis_1, breakdown_1 ORDER BY x_axis_1",
+              "customQuery": true,
+              "fields": {
+                "stream": "__STREAM__",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "x_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Logs",
+                    "alias": "y_axis_1",
+                    "column": "_timestamp"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 24,
+            "y": 34,
+            "w": 24,
+            "h": 9,
+            "i": 12,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null
+          }
+        },
+        {
+          "id": "panel_13",
+          "type": "table",
+          "title": "Recent errors and warnings",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT _timestamp, severity, body, code_namespace, trace_id FROM \"__STREAM__\" WHERE severity IN ('ERROR', 'WARN') ORDER BY _timestamp DESC LIMIT 100",
+              "customQuery": true,
+              "fields": {
+                "stream": "__STREAM__",
+                "stream_type": "logs",
+                "x": [
+                  {
+                    "label": "Time",
+                    "alias": "_timestamp",
+                    "column": "_timestamp"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Severity",
+                    "alias": "severity",
+                    "column": "severity"
+                  },
+                  {
+                    "label": "Message",
+                    "alias": "body",
+                    "column": "body"
+                  },
+                  {
+                    "label": "Logger",
+                    "alias": "code_namespace",
+                    "column": "code_namespace"
+                  },
+                  {
+                    "label": "Trace",
+                    "alias": "trace_id",
+                    "column": "trace_id"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 43,
+            "w": 48,
+            "h": 10,
+            "i": 13,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "drilldown": [
+              {
+                "name": "Open trace",
+                "type": "byUrl",
+                "targetBlank": true,
+                "data": {
+                  "url": "__BASE_URL__/web/traces/trace-details?stream=__STREAM__&trace_id=${row.field.trace_id}&from=${start_time}&to=${end_time}&refresh=0&org_identifier=__ORG__&reload=true"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "panel_14",
+          "type": "table",
+          "title": "Slowest database queries",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT q._timestamp, q.duration / 1000.0 as duration_ms, r.uri as endpoint, q.jdbc_query_0_ as statement, q.jdbc_datasource_name as datasource, q.trace_id as trace_id FROM \"__STREAM__\" as q JOIN \"__STREAM__\" as r ON q.trace_id = r.trace_id WHERE q.operation_name = 'query' AND r.span_kind = 2 ORDER BY duration_ms DESC LIMIT 100",
+              "customQuery": true,
+              "fields": {
+                "stream": "__STREAM__",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "Endpoint",
+                    "alias": "endpoint",
+                    "column": "endpoint"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Query",
+                    "alias": "statement",
+                    "column": "statement"
+                  },
+                  {
+                    "label": "Duration (ms)",
+                    "alias": "duration_ms",
+                    "column": "duration"
+                  },
+                  {
+                    "label": "Datasource",
+                    "alias": "datasource",
+                    "column": "datasource"
+                  },
+                  {
+                    "label": "Trace",
+                    "alias": "trace_id",
+                    "column": "trace_id"
+                  },
+                  {
+                    "label": "Time",
+                    "alias": "_timestamp",
+                    "column": "_timestamp"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 53,
+            "w": 48,
+            "h": 10,
+            "i": 14,
+            "moved": false
+          },
+          "config": {
+            "show_legends": false,
+            "legends_position": null,
+            "unit": "milliseconds",
+            "decimals": 2,
+            "drilldown": [
+              {
+                "name": "Open trace",
+                "type": "byUrl",
+                "targetBlank": true,
+                "data": {
+                  "url": "__BASE_URL__/web/traces/trace-details?stream=__STREAM__&trace_id=${row.field.trace_id}&from=${start_time}&to=${end_time}&refresh=0&org_identifier=__ORG__&reload=true"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "panel_15",
+          "type": "h-bar",
+          "title": "Slowest operations overall",
+          "description": "",
+          "queryType": "sql",
+          "queries": [
+            {
+              "query": "SELECT operation_name as x_axis_1, max(duration) / 1000 as y_axis_1 FROM \"__STREAM__\" GROUP BY x_axis_1 ORDER BY y_axis_1 DESC",
+              "customQuery": true,
+              "fields": {
+                "stream": "__STREAM__",
+                "stream_type": "traces",
+                "x": [
+                  {
+                    "label": "Operation",
+                    "alias": "x_axis_1",
+                    "column": "x_axis_1"
+                  }
+                ],
+                "y": [
+                  {
+                    "label": "Duration (ms)",
+                    "alias": "y_axis_1",
+                    "column": "duration"
+                  }
+                ],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                },
+                "z": []
+              },
+              "config": {
+                "promql_legend": ""
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 63,
+            "w": 48,
+            "h": 11,
+            "i": 15,
+            "moved": false
+          },
+          "config": {
+            "show_legends": true,
+            "legends_position": null,
+            "unit": "milliseconds"
+          }
+        }
+      ]
+    }
+  ]
+}
