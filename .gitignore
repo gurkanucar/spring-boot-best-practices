@@ -1,2 +1,5 @@
 # Superpowers spec/plan dokümanları (lokal kalsın)
 docs/superpowers/
+
+# Playwright MCP browser logs/snapshots
+.playwright-mcp/

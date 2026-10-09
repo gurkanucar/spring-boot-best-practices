@@ -1,0 +1,24 @@
+# A stand-in for Globex's corporate identity provider (Azure AD / Okta / ...). Static users only.
+issuer: http://globex.localhost:5557/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5557
+oauth2:
+  skipApprovalScreen: true
+enablePasswordDB: true
+staticClients:
+  - id: logto
+    name: Logto
+    secret: globex-secret
+    redirectURIs:
+      - http://localhost:3011/callback/zy2be0b4zinc
+staticPasswords:
+  - email: ceo@globex.test
+    hash: "$2a$10$7gCAeGga7GmpboYx.C/NteZE0DNO83XRGRX1LF1R59dJcHAUVAqs."
+    username: ceo-globex
+    userID: globex-0001
+  - email: staff@globex.test
+    hash: "$2a$10$7gCAeGga7GmpboYx.C/NteZE0DNO83XRGRX1LF1R59dJcHAUVAqs."
+    username: staff-globex
+    userID: globex-0002

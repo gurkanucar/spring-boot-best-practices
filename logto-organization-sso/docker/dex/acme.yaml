@@ -1,0 +1,24 @@
+# A stand-in for Acme's corporate identity provider (Azure AD / Okta / ...). Static users only.
+issuer: http://acme.localhost:5556/dex
+storage:
+  type: memory
+web:
+  http: 0.0.0.0:5556
+oauth2:
+  skipApprovalScreen: true
+enablePasswordDB: true
+staticClients:
+  - id: logto
+    name: Logto
+    secret: acme-secret
+    redirectURIs:
+      - http://localhost:3011/callback/tieyz0pk8uof
+staticPasswords:
+  - email: ceo@acme.test
+    hash: "$2a$10$7gCAeGga7GmpboYx.C/NteZE0DNO83XRGRX1LF1R59dJcHAUVAqs."
+    username: ceo-acme
+    userID: acme-0001
+  - email: staff@acme.test
+    hash: "$2a$10$7gCAeGga7GmpboYx.C/NteZE0DNO83XRGRX1LF1R59dJcHAUVAqs."
+    username: staff-acme
+    userID: acme-0002

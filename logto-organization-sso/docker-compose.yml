@@ -1,0 +1,65 @@
+# Logto + two fake corporate identity providers (Dex), to try Organizations with one SSO connector each.
+#
+#   Logto OIDC endpoint : http://localhost:3011   Admin console : http://localhost:3012
+#   Dex "Acme"          : http://acme.localhost:5556/dex    (ceo@acme.test / staff@acme.test)
+#   Dex "Globex"        : http://globex.localhost:5557/dex  (ceo@globex.test / staff@globex.test), password123
+#   PostgreSQL          : localhost:5438
+#
+# *.localhost resolves to 127.0.0.1 in browsers. Logto, in its container, must reach the same names,
+# hence extra_hosts below (host-gateway = the host, where the Dex ports are published).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  logto:
+    image: svhd/logto:1.43.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["sh", "-c", "npm run cli db seed -- --swe && npm start"]
+    environment:
+      TRUST_PROXY_HEADER: 1
+      DB_URL: postgres://postgres:postgres@postgres:5432/logto
+      ENDPOINT: http://localhost:3011
+      ADMIN_ENDPOINT: http://localhost:3012
+      # Logto refuses outgoing requests to private addresses (SSRF protection) unless allowed here:
+      # the Dex ports on the host, reached through host-gateway.
+      SSRF_ALLOWED_ADDRESSES: 192.168.65.254,172.17.0.1,192.168.65.0/24,172.16.0.0/12
+    extra_hosts:
+      - "acme.localhost:host-gateway"
+      - "globex.localhost:host-gateway"
+    ports:
+      - "127.0.0.1:3011:3001"
+      - "127.0.0.1:3012:3002"
+
+  dex-acme:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes:
+      - ./docker/dex/acme.yaml:/etc/dex/config.yaml:ro
+    ports:
+      - "127.0.0.1:5556:5556"
+
+  dex-globex:
+    image: ghcr.io/dexidp/dex:v2.41.1
+    command: ["dex", "serve", "/etc/dex/config.yaml"]
+    volumes:
+      - ./docker/dex/globex.yaml:/etc/dex/config.yaml:ro
+    ports:
+      - "127.0.0.1:5557:5557"
+
+volumes:
+  postgres-data:

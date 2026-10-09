@@ -78,7 +78,7 @@ Two example columns, chosen by the user here and unknown to the provider:
 |---|---|---|
 | Issuer | `http://localhost:3001/oidc` | `http://localhost:8000` (no path) |
 | ID token signature | ES384: needs `idTokenDecoderFactory` | RS256 (Spring's default): no decoder bean |
-| Roles | `roles` scope, claim is a list of names | no scope needed; claim `roles` is a list of **role objects** in the default `JWT` token format (`[{"owner":"demo","name":"admin",...}]`). `CasdoorOidcUserService.rolesOf` returns the names and accepts objects and plain names (custom token format) |
+| Roles | `roles` scope, claim is a list of names | no scope needed; claim `roles` is a list of **role objects** in the default `JWT` token format (confirmed) (`[{"owner":"demo","name":"admin",...}]`). `CasdoorOidcUserService.rolesOf` returns the names and accepts objects and plain names (custom token format) |
 | Roles are read from | userinfo + ID token merged | the ID token only (userinfo may carry a differently shaped `roles`) |
 | Setup | console + `setup.sh` (Management API) | `init_data.json`, loaded at start |
 | Webhooks, `/api/**` bearer API | included | not ported |
@@ -93,6 +93,11 @@ Two example columns, chosen by the user here and unknown to the provider:
 
 ## Status
 
-Unit and web-layer tests pass (`./mvnw test`, 22 tests, no Casdoor needed). The Docker part
-(`docker-compose.yml`, `init_data.json`, the Casdoor environment variables, end-session redirect)
-was written from Casdoor's docs and source and **has not been run against a live Casdoor** yet.
+Checked end to end against Casdoor (`casbin/casdoor:latest`, 2026-10-09) with `docker compose up -d`
+and curl: `init_data.json` seeds the organization, application, roles and users; sign-in as `alice`
+(`ROLE_admin`: `/admin`, `/user`, `/reports` 200) and `bob` (`ROLE_user`: `/admin` 403, `/user` 200);
+the `app_user` row is created; `PUT /me/preferences` saves `nickname`/`theme` (400 on a bad theme);
+`@Async` runs for the signed-in user; `POST /logout` redirects to Casdoor's `end_session_endpoint`,
+which sends the browser back to `/`, and `/me` then asks for a sign-in again.
+Not checked: that Casdoor's own SSO cookie is gone after sign-out (needs a real browser), and other
+Casdoor versions. `./mvnw test`: 22 tests, no Casdoor needed.
