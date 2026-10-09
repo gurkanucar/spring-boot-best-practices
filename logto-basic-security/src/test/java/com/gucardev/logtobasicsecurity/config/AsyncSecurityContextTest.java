@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gucardev.logtobasicsecurity.report.ReportService;
 import com.gucardev.logtobasicsecurity.security.CurrentUserService;
-import java.time.Instant;
+import com.gucardev.logtobasicsecurity.security.TestAuthUser;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -14,8 +14,6 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.core.oidc.OidcIdToken;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
 /**
@@ -55,8 +53,7 @@ class AsyncSecurityContextTest {
     }
 
     private static void signIn(String logtoId) {
-        var idToken = new OidcIdToken("token", Instant.now(), Instant.now().plusSeconds(60), Map.of("sub", logtoId));
-        var user = new DefaultOidcUser(List.of(), idToken);
+        var user = TestAuthUser.of(logtoId);
         SecurityContextHolder.getContext().setAuthentication(new OAuth2AuthenticationToken(user, List.of(), "logto"));
     }
 }

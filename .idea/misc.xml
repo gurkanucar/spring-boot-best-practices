@@ -32,6 +32,7 @@
         <option value="$PROJECT_DIR$/jwt-auth-refresh-token-roles/pom.xml" />
         <option value="$PROJECT_DIR$/otp-verification/pom.xml" />
         <option value="$PROJECT_DIR$/open-observe/pom.xml" />
+        <option value="$PROJECT_DIR$/casdoor-basic-security/pom.xml" />
       </list>
     </option>
   </component>

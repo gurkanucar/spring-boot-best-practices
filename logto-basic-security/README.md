@@ -190,8 +190,10 @@ app: LogtoOidcUserService → roles claim → ROLE_*, upsert app_user → sessio
 security/
   SecurityConfig          rules, oauth2Login, logout at Logto too, ES384 ID token decoder, RoleHierarchy
   LogtoOidcUserService    after each sign-in: Logto roles -> ROLE_*, records the local user
-  CurrentUser             @CurrentUser OidcUser user: the signed-in user as a controller parameter
+  AuthUser                the signed-in user (OidcUser + id, display name, parsed roles)
+  CurrentUser             @CurrentUser AuthUser user: the signed-in user as a controller parameter
   CurrentUserService      the signed-in user in services, from the SecurityContext
+  AuthService            profile(): the signed-in user plus the local app_user row (for /me)
 user/
   AppUser                 the app's own row per Logto user, linked by Logto's user id (sub)
   AppUserRepository       insertIfMissing: INSERT ... ON CONFLICT DO NOTHING
@@ -238,13 +240,15 @@ report/
   authorities exactly as Logto sent them. It names only roles that include others; every other
   role, including ones added in Logto later, works as before. The other way round does not hold:
   a `user` is not an `admin`.
-- **The signed-in user**: `OidcUser` holds everything Logto sent at sign-in (`getSubject()`,
-  `getEmail()`, `getClaimAsStringList("roles")`, ...); knowing who is calling needs no database.
+- **The signed-in user**: `AuthUser` (an `OidcUser` subclass built by `LogtoOidcUserService`) is the
+  principal, already parsed: `getId()`, `getEmail()`, `getDisplayName()`, `getRoles()`, and every raw
+  claim in `getClaims()`. Nothing outside the OIDC user service knows how Logto spells things.
 
   ```java
-  public Me me(@CurrentUser OidcUser user) { ... }          // controllers (@AuthenticationPrincipal)
+  public Map<String, Object> admin(@CurrentUser AuthUser user) { ... }   // controllers
 
-  String logtoId = currentUserService.logtoId();            // services (SecurityContextHolder)
+  String id = currentUserService.id();                                    // services (SecurityContextHolder)
+  UserProfile profile = authService.profile(); // user + the local app_user row
   ```
 
   The claims are a snapshot from sign-in; for fresh data call Logto's userinfo endpoint with the
@@ -323,6 +327,21 @@ report/
   `ALTER TABLE app_user ALTER COLUMN last_sign_in_at DROP NOT NULL;` (or `docker compose down -v`).
   One more reason for Flyway or Liquibase in a real application.
 
+## Data that belongs to the application (`nickname`, `theme`)
+
+Logto own identity; `app_user` is where the application keeps what is *its own* about a user.
+Two example columns, chosen by the user here and unknown to the provider:
+
+| | |
+|---|---|
+| `PUT /me/preferences` | JSON `{"nickname": "Ally", "theme": "dark"}`; CSRF token needed (browser session) |
+| `GET /me` | `localUser.nickname` / `localUser.theme` |
+
+- `theme` must be `light` or `dark`, `nickname` at most 50 characters (`AppUserService.updatePreferences`).
+- Sign-ins and webhooks only refresh e-mail and name, so they never overwrite these two.
+- `ddl-auto: update` adds the new nullable columns to an existing `app_user`; a real application
+  uses Flyway/Liquibase for that.
+
 ## Tests
 
 - `HomeControllerTest` (`@WebMvcTest`, no Logto needed): `/` is public; `/me` redirects anonymous
@@ -332,7 +351,7 @@ report/
   user from `CurrentUserService`;
   sign-out redirects to Logto's `end_session_endpoint` with `id_token_hint` and
   `post_logout_redirect_uri`.
-- `LogtoOidcUserServiceTest`: Logto roles become `ROLE_*` authorities.
+- `LogtoOidcUserServiceTest`: role names from the `roles` claim; `AuthUser` turns them into `ROLE_*` authorities.
 - `CurrentUserServiceTest`: the signed-in user from the security context; empty or an error when
   nobody is signed in.
 - `LogtoWebhookControllerTest` (`@WebMvcTest`, payloads shaped like Logto's): each event reaches

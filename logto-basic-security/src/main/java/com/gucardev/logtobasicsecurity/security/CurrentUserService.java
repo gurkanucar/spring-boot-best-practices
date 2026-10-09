@@ -3,7 +3,6 @@ package com.gucardev.logtobasicsecurity.security;
 import java.util.Optional;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
 /**
@@ -20,21 +19,21 @@ import org.springframework.stereotype.Component;
 public class CurrentUserService {
 
     /** Empty when nobody is signed in. */
-    public Optional<OidcUser> find() {
+    public Optional<AuthUser> find() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null && authentication.getPrincipal() instanceof OidcUser user) {
+        if (authentication != null && authentication.getPrincipal() instanceof AuthUser user) {
             return Optional.of(user);
         }
         return Optional.empty();
     }
 
     /** @throws IllegalStateException when nobody is signed in: a bug where only signed-in users get */
-    public OidcUser get() {
+    public AuthUser get() {
         return find().orElseThrow(() -> new IllegalStateException("No signed-in user"));
     }
 
-    /** Logto's user id ({@code sub}): stable, unlike the e-mail. The key to store with the user's data. */
-    public String logtoId() {
-        return get().getSubject();
+    /** The user's id ({@code sub}): stable, unlike the e-mail. The key to store with the user's data. */
+    public String id() {
+        return get().getId();
     }
 }

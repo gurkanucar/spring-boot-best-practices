@@ -1,0 +1,42 @@
+server:
+  port: 8103
+
+spring:
+  application:
+    name: casdoor-basic-security
+  config:
+    # Optional local overrides (CASDOOR_CLIENT_ID, CASDOOR_CLIENT_SECRET) from a git-ignored .env.
+    # Relative paths are resolved from the working directory: the module with ./mvnw, but the
+    # repository root with an IntelliJ run configuration that does not set one.
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:casdoor-basic-security/.env[.properties]
+  datasource:
+    # docker-compose.yml: the "app" database, not Casdoor's.
+    url: jdbc:postgresql://localhost:5437/app
+    username: app
+    password: app
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Demo only: creates the app_user table. Use Flyway or Liquibase in a real application.
+      ddl-auto: update
+  security:
+    oauth2:
+      client:
+        registration:
+          # The registration id "casdoor" is part of the redirect URI: /login/oauth2/code/casdoor
+          casdoor:
+            client-name: Casdoor
+            # Defaults match docker/casdoor/init_data.json (local demo only, never reuse them).
+            client-id: ${CASDOOR_CLIENT_ID:spring-boot-client-id}
+            client-secret: ${CASDOOR_CLIENT_SECRET:spring-boot-client-secret}
+            scope:
+              - openid
+              - profile
+              - email
+        provider:
+          casdoor:
+            # Endpoints and keys are read from <issuer-uri>/.well-known/openid-configuration at
+            # startup, so Casdoor must be running before the application starts.
+            issuer-uri: http://localhost:8000

@@ -44,12 +44,28 @@ public class AppUser {
     /** Null until the user signs in to this application (a user created in Logto by a webhook). */
     private Instant lastSignInAt;
 
+    /**
+     * Chosen by the user in this application; Logto knows nothing about it. This is what a local user
+     * table is for: data that is ours, next to the identity that is Logto's. Null until set.
+     */
+    @Column(length = 50)
+    private String nickname;
+
+    /** Interface preference, {{@code light}} or {{@code dark}}; also ours. Null until set. */
+    @Column(length = 10)
+    private String theme;
+
     // No constructor: rows are created by AppUserRepository.insertIfMissing, safe under concurrency.
 
     /** E-mail and name are copies of Logto's, refreshed on every sign-in and webhook. */
     void updateProfile(String email, String name) {
         this.email = email;
         this.name = name;
+    }
+
+    void updatePreferences(String nickname, String theme) {
+        this.nickname = nickname;
+        this.theme = theme;
     }
 
     void signedIn(Instant now) {

@@ -1,0 +1,57 @@
+{
+  "organizations": [
+    {
+      "owner": "admin",
+      "name": "demo",
+      "displayName": "Demo",
+      "passwordType": "plain",
+      "defaultApplication": "spring-boot",
+      "enableSoftDeletion": false
+    }
+  ],
+  "applications": [
+    {
+      "owner": "admin",
+      "name": "spring-boot",
+      "displayName": "Spring Boot",
+      "organization": "demo",
+      "cert": "cert-built-in",
+      "clientId": "spring-boot-client-id",
+      "clientSecret": "spring-boot-client-secret",
+      "enablePassword": true,
+      "enableSignUp": true,
+      "enableCodeSignin": false,
+      "grantTypes": ["authorization_code", "refresh_token"],
+      "tokenFormat": "JWT",
+      "expireInHours": 168,
+      "refreshExpireInHours": 168,
+      "signinMethods": [{"name": "Password", "displayName": "Password", "rule": "All"}],
+      "signupItems": [
+        {"name": "ID", "visible": false, "required": true, "prompted": false, "rule": "Random"},
+        {"name": "Username", "visible": true, "required": true, "prompted": false, "rule": "None"},
+        {"name": "Display name", "visible": true, "required": true, "prompted": false, "rule": "None"},
+        {"name": "Password", "visible": true, "required": true, "prompted": false, "rule": "None"},
+        {"name": "Confirm password", "visible": true, "required": true, "prompted": false, "rule": "None"},
+        {"name": "Email", "visible": true, "required": true, "prompted": false, "rule": "None"}
+      ],
+      "redirectUris": [
+        "http://localhost:8103/login/oauth2/code/casdoor",
+        "http://localhost:8103/"
+      ]
+    }
+  ],
+  "roles": [
+    {"owner": "demo", "name": "admin", "displayName": "Admin", "users": ["demo/alice"], "isEnabled": true},
+    {"owner": "demo", "name": "user", "displayName": "User", "users": ["demo/bob"], "isEnabled": true}
+  ],
+  "users": [
+    {
+      "owner": "demo", "name": "alice", "displayName": "Alice (admin)", "type": "normal-user",
+      "password": "alice123", "email": "alice@example.com", "signupApplication": "spring-boot"
+    },
+    {
+      "owner": "demo", "name": "bob", "displayName": "Bob (user)", "type": "normal-user",
+      "password": "bob123", "email": "bob@example.com", "signupApplication": "spring-boot"
+    }
+  ]
+}

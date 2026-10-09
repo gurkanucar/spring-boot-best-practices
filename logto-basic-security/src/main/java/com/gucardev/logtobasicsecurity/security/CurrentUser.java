@@ -11,7 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
  * The signed-in user as a controller parameter, {@code null} when nobody is signed in:
  *
  * <pre>{@code
- * public Me me(@CurrentUser OidcUser user) { ... }
+ * public Map<String, Object> admin(@CurrentUser AuthUser user) { ... }
  * }</pre>
  *
  * <p>A shorter name for {@link AuthenticationPrincipal}, and one place to change if the principal

@@ -22,7 +22,7 @@ public class ReportService {
     @PreAuthorize("hasAnyRole('admin', 'user')")
     public Map<String, Object> list() {
         return Map.of(
-                "requestedBy", currentUser.logtoId(),
+                "requestedBy", currentUser.id(),
                 "reports", List.of(Map.of("id", 1, "name", "Monthly sales"), Map.of("id", 2, "name", "Active users")));
     }
 
@@ -33,7 +33,7 @@ public class ReportService {
     @Async
     public CompletableFuture<Map<String, Object>> generate() {
         return CompletableFuture.completedFuture(Map.of(
-                "requestedBy", currentUser.logtoId(),
+                "requestedBy", currentUser.id(),
                 "thread", Thread.currentThread().getName(),
                 "status", "generated"));
     }

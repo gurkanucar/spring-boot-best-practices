@@ -1,16 +1,11 @@
 package com.gucardev.logtobasicsecurity.security;
 
 import com.gucardev.logtobasicsecurity.user.AppUserService;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
-import org.springframework.security.oauth2.core.oidc.IdTokenClaimNames;
-import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
@@ -33,20 +28,17 @@ public class LogtoOidcUserService extends OidcUserService {
 
     @Override
     public OidcUser loadUser(OidcUserRequest userRequest) {
-        OidcUser user = super.loadUser(userRequest); // ID token claims + the userinfo endpoint
+        OidcUser base = super.loadUser(userRequest); // ID token claims + the userinfo endpoint
+        AuthUser user = new AuthUser(base, rolesOf(base.getClaims()));
         appUserService.recordSignIn(user);
-
-        Set<GrantedAuthority> authorities = new HashSet<>(user.getAuthorities()); // OIDC_USER, SCOPE_*
-        authorities.addAll(rolesOf(user));
-        return new DefaultOidcUser(authorities, user.getIdToken(), user.getUserInfo(), IdTokenClaimNames.SUB);
+        return user;
     }
 
-    /** Logto role {@code admin} becomes {@code ROLE_admin}, so {@code hasRole("admin")} works. */
-    static List<GrantedAuthority> rolesOf(OidcUser user) {
-        List<String> roles = user.getClaimAsStringList(ROLES_CLAIM);
-        if (roles == null) {
-            return List.of();
+    /** Role names from the {@code roles} claim, e.g. {@code ["admin"]}; none when the claim is missing. */
+    static List<String> rolesOf(Map<String, Object> claims) {
+        if (claims.get(ROLES_CLAIM) instanceof List<?> roles) {
+            return roles.stream().filter(String.class::isInstance).map(String.class::cast).toList();
         }
-        return roles.stream().<GrantedAuthority>map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList();
+        return List.of();
     }
 }
